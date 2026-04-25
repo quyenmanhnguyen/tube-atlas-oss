@@ -1,0 +1,14 @@
+streamlit>=1.36
+google-api-python-client>=2.120
+youtube-transcript-api>=1.0
+youtube-comment-downloader>=0.1.76
+pytrends>=4.9.2
+yt-dlp>=2024.8.6
+requests>=2.32
+pandas>=2.2
+plotly>=5.22
+python-dotenv>=1.0
+openai>=1.40
+vaderSentiment>=3.3.2
+wordcloud>=1.9
+matplotlib>=3.9
