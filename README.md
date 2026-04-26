@@ -8,8 +8,27 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-blue)](https://platform.deepseek.com)
+[![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
 <img src="https://img.shields.io/badge/Tools-10%20features-7c3aed?style=for-the-badge" alt="10 features">
+
+</div>
+
+---
+
+## 📸 Preview
+
+<div align="center">
+
+### Dashboard
+![Dashboard](assets/screenshot-dashboard.png)
+
+### Keyword Generator (no API key needed!)
+![Keyword Generator](assets/screenshot-keyword.png)
+
+### Video → Text Converter
+![Video to Text](assets/screenshot-transcript.png)
 
 </div>
 
@@ -38,7 +57,7 @@
 
 ```bash
 # Clone repo
-git clone https://github.com/YOUR_USERNAME/tube-atlas-oss.git
+git clone https://github.com/quyenmanhnguyen/tube-atlas-oss.git
 cd tube-atlas-oss
 
 # Cài dependencies
@@ -53,6 +72,29 @@ streamlit run app.py
 ```
 
 Mở browser tại **http://localhost:8501** 🎉
+
+---
+
+## 🐳 Docker
+
+```bash
+docker build -t tube-atlas-oss .
+docker run -p 8501:8501 --env-file .env tube-atlas-oss
+```
+
+---
+
+## ☁️ Deploy lên Streamlit Cloud (free)
+
+1. Fork repo này
+2. Vào [share.streamlit.io](https://share.streamlit.io) → Connect GitHub
+3. Chọn repo `tube-atlas-oss` → Main file: `app.py`
+4. Advanced settings → Secrets:
+   ```toml
+   YOUTUBE_API_KEY = "AIza..."
+   DEEPSEEK_API_KEY = "sk-..."
+   ```
+5. Click Deploy → có URL public trong ~2 phút
 
 ---
 
@@ -95,6 +137,7 @@ Mở browser tại **http://localhost:8501** 🎉
 | Trends | [pytrends](https://github.com/GeneralMills/pytrends) (`gprop='youtube'`) |
 | Sentiment | [vaderSentiment](https://github.com/cjhutto/vaderSentiment) |
 | AI | [DeepSeek](https://platform.deepseek.com) via OpenAI SDK |
+| Container | [Docker](https://www.docker.com/) |
 
 ---
 
@@ -103,8 +146,12 @@ Mở browser tại **http://localhost:8501** 🎉
 ```
 tube-atlas-oss/
 ├── .env.example          # Template API keys
+├── .github/
+│   └── workflows/
+│       └── ci.yml        # Ruff lint + syntax check
 ├── .streamlit/
 │   └── config.toml       # Dark premium theme
+├── Dockerfile            # Docker container
 ├── app.py                # Dashboard chính
 ├── core/
 │   ├── autocomplete.py   # YouTube keyword suggestions
@@ -120,8 +167,15 @@ tube-atlas-oss/
 │   ├── 2_Trends_Generator.py
 │   ├── ...
 │   └── 10_Shorts_Analyzer.py
+├── assets/               # Screenshots
 └── requirements.txt
 ```
+
+---
+
+## 🤝 Contributing
+
+PRs welcome! Fork → Branch → Commit → Pull Request.
 
 ---
 
@@ -134,5 +188,7 @@ MIT — tự do sử dụng, chỉnh sửa, chia sẻ.
 <div align="center">
 
 **Made with ❤️ using Streamlit + DeepSeek + YouTube Data API**
+
+⭐ Star repo nếu thấy hữu ích!
 
 </div>
