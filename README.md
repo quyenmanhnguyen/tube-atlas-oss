@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-10%20features-7c3aed?style=for-the-badge" alt="10 features">
+<img src="https://img.shields.io/badge/Tools-11%20features-7c3aed?style=for-the-badge" alt="11 features">
 
 </div>
 
@@ -48,8 +48,17 @@
 | 🕸️ | **Browser Extractor** | Search + scrape data bulk | ✅ YouTube |
 | 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
 | 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
+| 🩺 | **Channel Audit** | Chấm điểm kênh 0-100 + recommendations | ✅ YouTube |
 
-> **6/10 tools hoạt động ngay** mà không cần API key nào!
+> **6/11 tools hoạt động ngay** mà không cần API key nào!
+
+### ✨ v1.1 highlights (VidIQ-parity features)
+
+- **⚡ Outlier Score** trong Channel Analyzer: flag video viral của competitor (`views/median(channel)` ≥5x = 🔥 viral, 2-5x = 📈 trên TB)
+- **⏰ Best Time to Post**: phân tích top videos → gợi ý ngày + giờ post tốt nhất (giờ VN UTC+7)
+- **🩺 Channel Audit**: chấm điểm kênh 0-100 trên 5 tiêu chí (upload frequency, engagement, tags coverage, title length, thumbnail HD) + recommendations cụ thể
+- **💾 SQLite cache** cho YouTube API → tiết kiệm 5-10x quota khi mở lại cùng kênh / search
+- **📝 Video→Text fallback**: tự động chuyển sang `yt-dlp` nếu `youtube-transcript-api` bị chặn IP (cloud env)
 
 ---
 

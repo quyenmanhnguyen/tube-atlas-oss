@@ -5,7 +5,12 @@ import os
 from functools import lru_cache
 from typing import Any
 
+from dotenv import load_dotenv
 from googleapiclient.discovery import build
+
+from . import cache as _cache
+
+load_dotenv()
 
 
 def _client():
@@ -18,6 +23,10 @@ def _client():
 
 
 def search_videos(query: str, max_results: int = 25, region: str = "VN", order: str = "relevance") -> list[dict]:
+    key = _cache.make_key("search", q=query, n=max_results, r=region, o=order)
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
     yt = _client()
     resp = yt.search().list(
         q=query,
@@ -27,20 +36,36 @@ def search_videos(query: str, max_results: int = 25, region: str = "VN", order: 
         regionCode=region,
         order=order,
     ).execute()
-    return resp.get("items", [])
+    items = resp.get("items", [])
+    _cache.set_(key, items, ttl=3 * 3600)
+    return items
 
 
 def videos_details(video_ids: list[str]) -> list[dict]:
-    yt = _client()
     out: list[dict] = []
-    for i in range(0, len(video_ids), 50):
-        chunk = video_ids[i : i + 50]
-        resp = yt.videos().list(
-            id=",".join(chunk),
-            part="snippet,statistics,contentDetails,topicDetails,status",
-            maxResults=50,
-        ).execute()
-        out.extend(resp.get("items", []))
+    miss: list[str] = []
+    by_id: dict[str, dict] = {}
+    for vid in video_ids:
+        c = _cache.get(_cache.make_key("video", id=vid))
+        if c is not None:
+            by_id[vid] = c
+        else:
+            miss.append(vid)
+    if miss:
+        yt = _client()
+        for i in range(0, len(miss), 50):
+            chunk = miss[i : i + 50]
+            resp = yt.videos().list(
+                id=",".join(chunk),
+                part="snippet,statistics,contentDetails,topicDetails,status",
+                maxResults=50,
+            ).execute()
+            for item in resp.get("items", []):
+                by_id[item["id"]] = item
+                _cache.set_(_cache.make_key("video", id=item["id"]), item, ttl=6 * 3600)
+    for vid in video_ids:
+        if vid in by_id:
+            out.append(by_id[vid])
     return out
 
 
@@ -55,14 +80,21 @@ def channel_details(channel_ids: list[str]) -> list[dict]:
 
 
 def channel_by_handle(handle: str) -> dict | None:
-    yt = _client()
     handle = handle.lstrip("@")
+    key = _cache.make_key("channel_handle", h=handle)
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
+    yt = _client()
     resp = yt.channels().list(
         forHandle=handle,
         part="snippet,statistics,brandingSettings,topicDetails",
     ).execute()
     items = resp.get("items", [])
-    return items[0] if items else None
+    val = items[0] if items else None
+    if val is not None:
+        _cache.set_(key, val, ttl=6 * 3600)
+    return val
 
 
 def channel_uploads_playlist(channel_id: str) -> str | None:
