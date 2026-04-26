@@ -91,7 +91,7 @@ input, textarea, [data-baseweb="select"] {
 }
 
 /* Header styling */
-h1 { 
+h1 {
     background: linear-gradient(135deg, #a855f7, #7c3aed, #6d28d9);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -163,7 +163,7 @@ if not yt_ok:
         3. Credentials → Create → **API key**
         4. Dán vào file `.env`: `YOUTUBE_API_KEY=your_key_here`
         5. Restart app: `streamlit run app.py`
-        
+
         > 💡 Free **10,000 units/ngày** ≈ 100 search hoặc 10,000 video lookup.
         """)
 
@@ -206,7 +206,7 @@ for i, (icon, name, desc, api, available) in enumerate(features):
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center; color:#64748b; font-size:0.8rem; padding:10px;">
-    📺 Tube Atlas OSS v1.0 · MIT License · 
+    📺 Tube Atlas OSS v1.0 · MIT License ·
     <a href="https://github.com" style="color:#7c3aed; text-decoration:none;">GitHub</a>
     · Built with Streamlit + DeepSeek + YouTube Data API
 </div>
