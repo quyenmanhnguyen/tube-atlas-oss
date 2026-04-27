@@ -47,6 +47,12 @@ if inp:
         m1.metric("Subscribers", humanize_int(stats.get("subscriberCount")))
         m2.metric("Total views", humanize_int(stats.get("viewCount")))
         m3.metric("Số video", humanize_int(stats.get("videoCount")))
+        # Cross-nav to other pages
+        st.markdown(
+            f"👉 [🩺 Audit kênh này](/Channel_Audit)  ·  "
+            f"[🕵️ Tìm đối thủ](/Competitor_Discovery)  ·  "
+            f"[▶️ Mở trên YouTube](https://youtube.com/channel/{ch['id']})"
+        )
 
     with st.spinner(f"Đang lấy {limit} video gần nhất..."):
         playlist = yt.channel_uploads_playlist(ch["id"])

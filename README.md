@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-13%20features%20%2B%20CLI-7c3aed?style=for-the-badge" alt="13 features + CLI">
+<img src="https://img.shields.io/badge/Tools-7%20features%20%2B%20CLI-7c3aed?style=for-the-badge" alt="7 features + CLI">
 
 </div>
 
@@ -34,25 +34,32 @@
 
 ---
 
-## ✨ Tính năng
+## ✨ Tính năng (v2.0 — slim & focused)
+
+Từ 13 tools của v1.2, v2.0 đã **consolidate xuống 7 tools** bằng cách xóa cái trùng (Browser Extractor, Shorts Analyzer, Content Spinner, Keyword/Trends page-level) và gộp cái cùng chung flow (Comment Analyzer → tab trong Video Analyzer, Content Spinner → mode trong Title Studio).
 
 | # | Tool | Mô tả | Cần API key? |
 |---|---|---|---|
-| 🔑 | **Keyword Generator** | Long-tail keywords từ YouTube Autocomplete | ❌ Free |
-| 📈 | **Trends Generator** | Google Trends cho YouTube + related queries | ❌ Free |
-| 🎬 | **Video Analyzer** | Stats, engagement, tags chi tiết | ✅ YouTube |
-| 📊 | **Channel Analyzer** | KPI kênh, upload frequency, top videos | ✅ YouTube |
-| ✨ | **Title Generator** | Gợi ý title CTR cao bằng AI | ✅ DeepSeek |
-| 📝 | **Video → Text** | Transcript / phụ đề từ YouTube | ❌ Free |
-| 🌀 | **Content Spinner** | Spin / rewrite nội dung bằng AI | ✅ DeepSeek |
-| 🕸️ | **Browser Extractor** | Search + scrape data bulk | ✅ YouTube |
-| 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
-| 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
-| 🩺 | **Channel Audit** | Chấm điểm kênh 0-100 + recommendations | ✅ YouTube |
-| 🔥 | **Niche Pulse** | Briefing song song YT + Trends + Autocomplete + AI cho 1 topic trong 30 ngày | ✅ YouTube |
-| 🕵️ | **Competitor Discovery** | Auto tìm top 5 kênh đối thủ cùng niche | ✅ YouTube |
+| 🔥 | **Niche Pulse** | Briefing N ngày (YT + Trends + Autocomplete + AI) · filter Shorts · export markdown | ✅ YouTube |
+| 🩺 | **Channel Audit** | Chấm điểm kênh 0-100 · **so sánh 2 kênh side-by-side** · export markdown | ✅ YouTube |
+| 📊 | **Channel Analyzer** | KPI kênh · outlier score · best time to post · cross-nav sang Audit | ✅ YouTube |
+| 🎬 | **Video Analyzer** | Stats + **SEO score 0-100** + **sentiment comments** (3 tab) | ✅ YouTube |
+| 🕵️ | **Competitor Discovery** | Auto tìm top N đối thủ cùng niche · keyword extraction có bigrams + recency bias | ✅ YouTube |
+| ✨ | **Title & Script Studio** | Sinh title · **rewrite/spin** · brainstorm ý tưởng (3 mode) | ✅ DeepSeek |
+| 📝 | **Video → Text** | Transcript / phụ đề (+ yt-dlp fallback) | ❌ Free |
+| 📌 | **My Projects** | Bookmark kênh / niche / video (local SQLite) | ❌ Free |
 
-> **6/13 tools hoạt động ngay** mà không cần API key nào!
+> **2/7 tools hoạt động ngay** (Video→Text + My Projects) không cần API key.
+
+### ✨ v2.0 highlights
+
+- **Video SEO Score 0-100** — chấm điểm 1 video trên 6 tiêu chí (title length, description, tags, thumbnail HD, engagement, keyword coverage) với grade A+/A/B/C/D/F + recommendations cụ thể.
+- **Channel Audit so sánh 2 kênh** — radar chart overlay, bảng điểm cạnh nhau, export markdown cả 2.
+- **Niche Pulse Shorts filter** — checkbox "Chỉ Shorts (≤60s)" + export briefing Markdown 1 click.
+- **Title & Script Studio 3 mode** — Generate title / Rewrite-Spin nội dung / Brainstorm ý tưởng trong 1 page duy nhất.
+- **Competitor Discovery cải tiến** — bigrams + recency bias + expanded stop-words (EN+VN) + loại token của tên kênh seed.
+- **My Projects** — bookmark kênh / niche / video yêu thích, mở nhanh lần sau.
+- **CLI `--json` trên mọi command** (doctor, audit, competitors, cache, projects) — trước đây chỉ có `niche` + `competitors`.
 
 ### ✨ v1.2 highlights (mượn ý từ `/last30days-skill` + `agent-reach`)
 

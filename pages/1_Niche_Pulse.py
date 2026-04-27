@@ -29,9 +29,10 @@ with st.form("pulse_form"):
     topic = c1.text_input("Chủ đề / niche", placeholder="VD: review iphone 17, day tieng anh, AI agent")
     region = c2.selectbox("Khu vực", ["VN", "US", "JP", "KR", "ID", "TH"], index=0)
     days = c3.slider("Số ngày", 7, 90, 30, 1)
-    c4, c5 = st.columns(2)
+    c4, c5, c6 = st.columns(3)
     inc_sent = c4.checkbox("Phân tích sentiment comment (chậm hơn ~20s)", value=True)
     inc_llm = c5.checkbox("Tổng hợp bằng AI (cần DEEPSEEK_API_KEY)", value=ds_ok, disabled=not ds_ok)
+    only_shorts = c6.checkbox("Chỉ Shorts (≤60s)", value=False)
     submitted = st.form_submit_button("🚀 Chạy quét")
 
 if not submitted:
@@ -50,6 +51,7 @@ with st.spinner(f"Đang quét '{topic}' trong {days} ngày gần nhất..."):
         days=days,
         include_sentiment=inc_sent,
         include_llm=inc_llm,
+        only_shorts=only_shorts,
     )
 elapsed = time.time() - t0
 
@@ -69,11 +71,61 @@ m4.metric("Thời gian quét", f"{elapsed:.1f}s")
 
 st.divider()
 
-# ── AI Briefing ──
+# ── AI Briefing + Export Markdown ──
+def _to_markdown(d: dict) -> str:
+    yyt = d.get("youtube", {})
+    vids = yyt.get("videos", [])
+    lines = [
+        f"# 🔥 Niche Pulse: {d.get('topic', '')}",
+        "",
+        f"- Khu vực: **{d.get('region', '')}**  ·  Khoảng: **{d.get('days', 0)} ngày**",
+        f"- Video mới: **{len(vids)}**  ·  Tổng view top 25: **{yyt.get('total_views', 0):,}**",
+        f"- Tỷ lệ Shorts: **{yyt.get('shorts_ratio', 0) * 100:.0f}%**",
+        "",
+    ]
+    if d.get("briefing"):
+        lines += ["## 🤖 AI Briefing", "", d["briefing"], ""]
+    lines += ["## 🎬 Top 10 video"]
+    for v in vids[:10]:
+        lines.append(
+            f"- [{v['title']}]({v['url']}) — {v['channel']} · "
+            f"{v['views']:,} views · {v['publishedAt'][:10]}"
+        )
+    lines.append("")
+    ac = d.get("autocomplete", [])
+    if ac:
+        lines += ["## 🔤 Long-tail keywords (autocomplete)", ", ".join(ac[:25]), ""]
+    tr = d.get("trends", {})
+    rising = tr.get("rising", []) if isinstance(tr, dict) else []
+    if rising:
+        lines += ["## 📈 Google Trends — rising queries"]
+        for q in rising[:10]:
+            lines.append(f"- {q.get('query', '')}  (+{q.get('value', '')}%)")
+        lines.append("")
+    sent = d.get("sentiment", {})
+    if sent.get("available"):
+        lines += [
+            "## 💬 Sentiment",
+            f"- Tích cực: {sent['positive']} ({sent['pos_pct']:.0f}%)",
+            f"- Trung lập: {sent['neutral']}",
+            f"- Tiêu cực: {sent['negative']} ({sent['neg_pct']:.0f}%)",
+            "",
+        ]
+    return "\n".join(lines)
+
+
 if data.get("briefing"):
     st.subheader("🤖 AI Briefing")
     st.markdown(data["briefing"])
-    st.divider()
+
+_md = _to_markdown(data)
+st.download_button(
+    "📥 Export briefing (Markdown)",
+    _md.encode("utf-8"),
+    file_name=f"niche_pulse_{topic[:30].strip().replace(' ', '_')}.md",
+    mime="text/markdown",
+)
+st.divider()
 
 # ── Tabs with raw data ──
 tab_vid, tab_tags, tab_sug, tab_trends, tab_sent = st.tabs(

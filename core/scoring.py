@@ -160,6 +160,126 @@ def _grade(score: float) -> str:
     return "F (cần đầu tư)"
 
 
+# ---------- Video SEO Score ----------
+
+def video_seo_score(video_raw: dict) -> dict:
+    """Chấm 1 video theo 6 tiêu chí SEO 0-100 + recommendations.
+
+    Input: dict từ YouTube Data API videos.list (part=snippet,statistics,contentDetails).
+    Output: {total, grade, parts: [{name, score, note}], recommendations: [str]}
+    """
+    sn = video_raw.get("snippet", {})
+    stats = video_raw.get("statistics", {})
+    title = sn.get("title", "") or ""
+    desc = sn.get("description", "") or ""
+    tags = sn.get("tags", []) or []
+    thumbs = sn.get("thumbnails", {}) or {}
+
+    parts: list[tuple[str, float, str, float]] = []
+
+    # 1. Title length (25% weight) — 30-70 ký tự là sweet spot
+    tl = len(title)
+    if 40 <= tl <= 70:
+        t_score = 100.0
+    elif 30 <= tl < 40 or 70 < tl <= 80:
+        t_score = 80.0
+    elif tl < 30:
+        t_score = max(20.0, tl / 30 * 80)
+    else:
+        t_score = max(30.0, 100 - (tl - 80) * 2)
+    parts.append(("Title length", t_score, f"{tl} ký tự (ideal 40-70)", 0.20))
+
+    # 2. Description length (15%) — ≥250 ký tự là tốt
+    dl = len(desc)
+    if dl >= 250:
+        d_score = 100.0
+    elif dl >= 100:
+        d_score = 50 + (dl - 100) / 150 * 50
+    else:
+        d_score = dl / 100 * 50
+    parts.append(("Description", d_score, f"{dl} ký tự (≥250 là tốt)", 0.15))
+
+    # 3. Tags (20%) — 8-20 tags
+    ntags = len(tags)
+    if 8 <= ntags <= 20:
+        tag_score = 100.0
+    elif ntags == 0:
+        tag_score = 0.0
+    elif ntags < 8:
+        tag_score = ntags / 8 * 80
+    else:
+        tag_score = max(50.0, 100 - (ntags - 20) * 3)
+    parts.append(("Tags", tag_score, f"{ntags} tags (ideal 8-20)", 0.20))
+
+    # 4. Thumbnail quality (15%) — có maxres = HD
+    if "maxres" in thumbs:
+        th_score = 100.0
+        th_note = "Có thumbnail HD (maxres)"
+    elif "high" in thumbs:
+        th_score = 60.0
+        th_note = "Thumbnail high (không HD)"
+    else:
+        th_score = 30.0
+        th_note = "Thumbnail thấp"
+    parts.append(("Thumbnail", th_score, th_note, 0.15))
+
+    # 5. Engagement (15%)
+    try:
+        views = int(stats.get("viewCount", 0))
+        likes = int(stats.get("likeCount", 0))
+        comments = int(stats.get("commentCount", 0))
+    except (TypeError, ValueError):
+        views = likes = comments = 0
+    if views > 0:
+        er = (likes + comments) / views * 100
+        if er >= 4:
+            e_score = 100.0
+        elif er >= 2:
+            e_score = 75 + (er - 2) * 12.5
+        elif er >= 1:
+            e_score = 50 + (er - 1) * 25
+        else:
+            e_score = er * 50
+        e_note = f"ER {er:.2f}% ({likes:,} likes + {comments:,} comments / {views:,} views)"
+    else:
+        e_score = 0.0
+        e_note = "Không có view"
+    parts.append(("Engagement", e_score, e_note, 0.15))
+
+    # 6. Keyword coverage (15%) — tags xuất hiện trong title/desc
+    if tags:
+        title_l = title.lower()
+        desc_l = desc.lower()
+        hits = sum(1 for t in tags if t.lower() in title_l or t.lower() in desc_l)
+        coverage = hits / len(tags) * 100
+        parts.append((
+            "Keyword coverage", coverage,
+            f"{hits}/{len(tags)} tags xuất hiện trong title/description",
+            0.15,
+        ))
+    else:
+        parts.append(("Keyword coverage", 0.0, "Không có tags để check", 0.15))
+
+    total = sum(s * w for _, s, _, w in parts)
+
+    recs: list[str] = []
+    for name, s, note, _ in parts:
+        if s < 50:
+            recs.append(f"⚠️ **{name}** ({s:.0f}/100): {note}")
+    if not recs:
+        recs.append("🎉 Video tối ưu SEO rất tốt!")
+
+    return {
+        "total": round(total, 1),
+        "grade": _grade(total),
+        "parts": [
+            {"name": n, "score": round(s, 1), "note": note, "weight": w}
+            for n, s, note, w in parts
+        ],
+        "recommendations": recs,
+    }
+
+
 # ---------- Best Time to Post ----------
 
 WEEKDAYS_VI = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]

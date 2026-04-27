@@ -28,10 +28,14 @@ def _iso_n_days_ago(n: int) -> str:
     return (dt.datetime.utcnow() - dt.timedelta(days=n)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _fetch_youtube(topic: str, region: str, days: int) -> dict[str, Any]:
+def _fetch_youtube(
+    topic: str, region: str, days: int, only_shorts: bool = False
+) -> dict[str, Any]:
     published_after = _iso_n_days_ago(days)
+    # Over-fetch when filtering shorts để đảm bảo còn đủ kết quả
+    n = 50 if only_shorts else 25
     items = youtube.search_videos(
-        topic, max_results=25, region=region, order="viewCount", published_after=published_after
+        topic, max_results=n, region=region, order="viewCount", published_after=published_after
     )
     ids = [it["id"]["videoId"] for it in items if it.get("id", {}).get("videoId")]
     details = youtube.videos_details(ids) if ids else []
@@ -41,6 +45,9 @@ def _fetch_youtube(topic: str, region: str, days: int) -> dict[str, Any]:
         s = v["snippet"]
         st = v.get("statistics", {})
         duration_s = int(parse_iso_duration(v["contentDetails"]["duration"]).total_seconds())
+        is_short = duration_s <= 60
+        if only_shorts and not is_short:
+            continue
         parsed.append({
             "id": v["id"],
             "title": s["title"],
@@ -50,13 +57,14 @@ def _fetch_youtube(topic: str, region: str, days: int) -> dict[str, Any]:
             "comments": int(st.get("commentCount", 0)),
             "publishedAt": s["publishedAt"],
             "duration_s": duration_s,
-            "is_short": duration_s <= 60,
+            "is_short": is_short,
             "tags": s.get("tags", []),
             "url": f"https://youtube.com/watch?v={v['id']}",
         })
         for t in s.get("tags", []):
             tag_count[t.lower()] = tag_count.get(t.lower(), 0) + 1
     parsed.sort(key=lambda x: x["views"], reverse=True)
+    parsed = parsed[:25]  # cap to 25 after filtering
     trending_tags = sorted(tag_count.items(), key=lambda kv: kv[1], reverse=True)[:20]
     return {
         "videos": parsed,
@@ -180,19 +188,24 @@ def niche_pulse(
     days: int = 30,
     include_sentiment: bool = True,
     include_llm: bool = True,
+    only_shorts: bool = False,
 ) -> dict[str, Any]:
     """Chạy full parallel research pipeline. Cache 1h."""
     cache_key = cache.make_key(
-        "niche_pulse", t=topic, r=region, d=days, s=include_sentiment, l=include_llm
+        "niche_pulse",
+        t=topic, r=region, d=days,
+        s=include_sentiment, l=include_llm, sh=only_shorts,
     )
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    data: dict[str, Any] = {"topic": topic, "region": region, "days": days}
+    data: dict[str, Any] = {
+        "topic": topic, "region": region, "days": days, "only_shorts": only_shorts,
+    }
     with ThreadPoolExecutor(max_workers=3) as ex:
         futs = {
-            ex.submit(_fetch_youtube, topic, region, days): "youtube",
+            ex.submit(_fetch_youtube, topic, region, days, only_shorts): "youtube",
             ex.submit(_fetch_autocomplete, topic, "vi" if region == "VN" else "en", region): "autocomplete",
             ex.submit(_fetch_trends, topic, region): "trends",
         }

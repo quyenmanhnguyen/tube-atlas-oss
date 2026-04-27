@@ -17,25 +17,80 @@ from typing import Any
 
 from . import cache, youtube
 
-_WORD = re.compile(r"[A-Za-zÀ-ỹ0-9]{4,}")
+_WORD = re.compile(r"[A-Za-zÀ-ỹ0-9]{3,}")
+
+# English + Vietnamese stop words (mở rộng)
+_STOP: set[str] = {
+    # EN
+    "the", "and", "for", "with", "video", "videos", "youtube", "this", "that", "are",
+    "has", "have", "new", "you", "your", "our", "from", "all", "how", "why", "what",
+    "when", "where", "who", "will", "can", "one", "two", "get", "got", "was", "were",
+    "not", "but", "out", "yes", "now", "just", "very", "more", "most", "some", "any",
+    "him", "her", "they", "them", "their", "ours", "about", "into", "over", "under",
+    # VN
+    "của", "một", "trong", "này", "với", "được", "những", "cho", "các", "là",
+    "và", "có", "thì", "cũng", "như", "để", "khi", "nếu", "mà", "nhưng",
+    "ai", "gì", "sao", "vì", "nên", "đã", "đang", "sẽ", "rất", "nhất",
+    "official", "full", "hd", "episode", "part", "tập", "phần",
+}
 
 
-def _extract_keywords(videos_raw: list[dict]) -> list[str]:
-    """Trả về top keywords (tags + title tokens) sort theo frequency."""
-    tags: Counter[str] = Counter()
+def _clean_token(tok: str) -> str:
+    tok = tok.lower().strip()
+    if tok.isdigit():
+        return ""
+    return tok
+
+
+def _extract_keywords(videos_raw: list[dict], seed_title: str = "") -> list[str]:
+    """Top keywords từ tags + title tokens + title bigrams (có recency bias).
+
+    - Tags trọng số 2x (manual curation của creator)
+    - Title bigrams trọng số 1.5x (chính xác hơn unigram cho niche như "iphone 17")
+    - Title unigrams trọng số 1x
+    - Video 10 gần nhất được nhân thêm 1.3x (recency bias)
+    - Loại stop-words EN+VN + số thuần + token của channel name
+    """
     tokens: Counter[str] = Counter()
-    for v in videos_raw:
+    # Loại token trong tên kênh (MrBeast → 'mrbeast' flood kết quả)
+    seed_tokens: set[str] = {
+        t for t in (_clean_token(x) for x in _WORD.findall(seed_title.lower())) if t
+    }
+
+    for idx, v in enumerate(videos_raw):
+        # videos_raw sorted recent first (uploads playlist reverse chronological)
+        recency = 1.3 if idx < 10 else 1.0
         s = v["snippet"]
-        for t in s.get("tags", []):
-            tags[t.lower()] += 2  # tag weighted 2x
-        for tok in _WORD.findall(s["title"].lower()):
-            tokens[tok] += 1
-    merged: Counter[str] = Counter()
-    merged.update(tags)
-    merged.update(tokens)
-    # Remove very generic
-    stop = {"the", "and", "video", "youtube", "của", "một", "trong", "này", "với", "được"}
-    return [w for w, _ in merged.most_common(30) if w not in stop][:10]
+
+        # Tags (2x)
+        for t in s.get("tags", []) or []:
+            t_clean = t.lower().strip()
+            if not t_clean or t_clean in _STOP or t_clean in seed_tokens:
+                continue
+            tokens[t_clean] += 2 * recency
+
+        # Title unigrams + bigrams
+        title_words = [
+            _clean_token(w) for w in _WORD.findall(s.get("title", "").lower())
+        ]
+        title_words = [w for w in title_words if w and w not in _STOP and w not in seed_tokens]
+        for tok in title_words:
+            tokens[tok] += 1 * recency
+        for a, b in zip(title_words, title_words[1:]):
+            bg = f"{a} {b}"
+            tokens[bg] += 1.5 * recency
+
+    # Prefer bigrams and tags (longer = more specific)
+    ranked = sorted(tokens.items(), key=lambda kv: (kv[1], len(kv[0])), reverse=True)
+    # Dedupe: drop unigrams already covered by a higher-ranked bigram
+    chosen: list[str] = []
+    for kw, _ in ranked:
+        if any(kw in prev.split() for prev in chosen if " " in prev):
+            continue
+        chosen.append(kw)
+        if len(chosen) >= 10:
+            break
+    return chosen
 
 
 def _seed_channel_videos(channel_id: str, n: int = 25) -> list[dict]:
@@ -66,7 +121,10 @@ def discover_competitors(
     keywords_limit: int = 5,
 ) -> dict[str, Any]:
     """Trả về dict với seed_info + top_n competitor channels + extracted keywords."""
-    ck = cache.make_key("competitors", ch=seed_channel_id, r=region, n=top_n, k=keywords_limit)
+    # v2: new keyword extraction (bigrams + recency + expanded stop-words)
+    ck = cache.make_key(
+        "competitors_v2", ch=seed_channel_id, r=region, n=top_n, k=keywords_limit,
+    )
     cached = cache.get(ck)
     if cached is not None:
         return cached
@@ -78,7 +136,7 @@ def discover_competitors(
     seed_title = seed["snippet"]["title"]
 
     videos_raw = _seed_channel_videos(seed_channel_id, n=25)
-    keywords = _extract_keywords(videos_raw)[:keywords_limit]
+    keywords = _extract_keywords(videos_raw, seed_title=seed_title)[:keywords_limit]
     if not keywords:
         return {"error": "Không extract được keyword từ kênh này"}
 
