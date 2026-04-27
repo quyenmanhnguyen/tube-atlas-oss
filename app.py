@@ -129,7 +129,7 @@ st.markdown("""
     <span style="font-size:3rem;">📺</span>
     <h1 style="margin:0; font-size:2.5rem;">Tube Atlas OSS</h1>
     <p style="color:#94a3b8; font-size:1.1rem; margin-top:4px;">
-        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 10 tools · Streamlit + DeepSeek + YouTube API
+        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 7 tools + CLI · Streamlit + DeepSeek + YouTube API
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -145,15 +145,19 @@ with col2:
     ds_ok = bool(os.getenv("DEEPSEEK_API_KEY"))
     st.metric("DeepSeek AI", "✅ Active" if ds_ok else "⚠️ Missing")
 with col3:
-    free_count = sum([
-        True,   # Keyword Generator
-        True,   # Trends Generator
-        True,   # Video To Text
-        ds_ok,  # Title Generator
-        ds_ok,  # Content Spinner
-        True,   # Comment Analyzer (basic)
+    # 7 tools tổng: Niche Pulse(YT), Channel Audit(YT), Channel Analyzer(YT),
+    # Video Analyzer(YT), Competitor Discovery(YT), Title Studio(DS), Video→Text(—)
+    available = sum([
+        yt_ok,   # Niche Pulse
+        yt_ok,   # Channel Audit
+        yt_ok,   # Channel Analyzer
+        yt_ok,   # Video Analyzer
+        yt_ok,   # Competitor Discovery
+        ds_ok,   # Title & Script Studio
+        True,    # Video → Text (fallback yt-dlp)
+        True,    # My Projects (local SQLite)
     ])
-    st.metric("Tools Available", f"{free_count + (4 if yt_ok else 0)}/10")
+    st.metric("Tools Available", f"{available}/8")
 
 if not yt_ok:
     with st.expander("⚙️ Cách lấy YouTube API Key (miễn phí, 2 phút)"):
@@ -171,21 +175,20 @@ if not yt_ok:
 st.subheader("🛠️ Bộ công cụ")
 
 features = [
-    ("🔑", "Keyword Generator", "Long-tail keywords từ YouTube Autocomplete", "Không", True),
-    ("📈", "Trends Generator", "Google Trends cho YouTube + related queries", "Không", True),
-    ("🎬", "Video Analyzer", "Stats, engagement, tags chi tiết", "YouTube", yt_ok),
-    ("📊", "Channel Analyzer", "KPI kênh, upload frequency, top videos", "YouTube", yt_ok),
-    ("✨", "Title Generator", "Gợi ý title CTR cao bằng AI", "DeepSeek", ds_ok),
-    ("📝", "Video → Text", "Transcript / phụ đề từ YouTube", "Không", True),
-    ("🔄", "Content Spinner", "Spin / rewrite nội dung bằng AI", "DeepSeek", ds_ok),
-    ("🌐", "Browser Extractor", "Search + scrape data bulk", "YouTube", yt_ok),
-    ("💬", "Comment Analyzer", "Sentiment analysis + audience insight", "Không*", True),
-    ("📱", "Shorts Analyzer", "Phân tích YouTube Shorts & trends", "YouTube", yt_ok),
+    ("🔥", "Niche Pulse", "Briefing N ngày — YT + Trends + Autocomplete + AI", "YouTube", yt_ok),
+    ("🩺", "Channel Audit", "Chấm điểm kênh 0-100 · so sánh 2 kênh", "YouTube", yt_ok),
+    ("📊", "Channel Analyzer", "KPI kênh · outlier · best time to post", "YouTube", yt_ok),
+    ("🎬", "Video Analyzer", "Stats + SEO score 0-100 + sentiment comments", "YouTube", yt_ok),
+    ("🕵️", "Competitor Discovery", "Auto tìm top N đối thủ cùng niche", "YouTube", yt_ok),
+    ("✨", "Title & Script Studio", "Sinh title · rewrite/spin · brainstorm ý tưởng", "DeepSeek", ds_ok),
+    ("📝", "Video → Text", "Transcript / phụ đề (+ yt-dlp fallback)", "Không", True),
+    ("📌", "My Projects", "Bookmark kênh, niche, video — local SQLite", "Không", True),
 ]
 
-cols = st.columns(5)
-for i, (icon, name, desc, api, available) in enumerate(features):
-    with cols[i % 5]:
+cols = st.columns(4)
+for i, (icon, name, desc, api, feature_available) in enumerate(features):
+    with cols[i % 4]:
+        available = feature_available
         status = "🟢" if available else "🔴"
         st.markdown(f"""
         <div style="
@@ -206,7 +209,7 @@ for i, (icon, name, desc, api, available) in enumerate(features):
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center; color:#64748b; font-size:0.8rem; padding:10px;">
-    📺 Tube Atlas OSS v1.0 · MIT License ·
+    📺 Tube Atlas OSS v2.0 · 7 tools + CLI + Claude Skill · MIT License ·
     <a href="https://github.com" style="color:#7c3aed; text-decoration:none;">GitHub</a>
     · Built with Streamlit + DeepSeek + YouTube Data API
 </div>
