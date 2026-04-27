@@ -129,7 +129,7 @@ st.markdown("""
     <span style="font-size:3rem;">📺</span>
     <h1 style="margin:0; font-size:2.5rem;">Tube Atlas OSS</h1>
     <p style="color:#94a3b8; font-size:1.1rem; margin-top:4px;">
-        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 11 tools · Streamlit + DeepSeek + YouTube API
+        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 13 tools + CLI · Streamlit + DeepSeek + YouTube API
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -153,7 +153,7 @@ with col3:
         ds_ok,  # Content Spinner
         True,   # Comment Analyzer (basic)
     ])
-    st.metric("Tools Available", f"{free_count + (5 if yt_ok else 0)}/11")
+    st.metric("Tools Available", f"{free_count + (7 if yt_ok else 0)}/13")
 
 if not yt_ok:
     with st.expander("⚙️ Cách lấy YouTube API Key (miễn phí, 2 phút)"):
@@ -182,6 +182,8 @@ features = [
     ("💬", "Comment Analyzer", "Sentiment analysis + audience insight", "Không*", True),
     ("📱", "Shorts Analyzer", "Phân tích YouTube Shorts & trends", "YouTube", yt_ok),
     ("🩺", "Channel Audit", "Chấm điểm kênh 0-100 + recommendations", "YouTube", yt_ok),
+    ("🔥", "Niche Pulse", "Briefing 30 ngày — song song YT+Trends+AI", "YouTube", yt_ok),
+    ("🕵️", "Competitor Discovery", "Auto tìm top 5 đối thủ cùng niche", "YouTube", yt_ok),
 ]
 
 cols = st.columns(5)
@@ -207,7 +209,7 @@ for i, (icon, name, desc, api, available) in enumerate(features):
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center; color:#64748b; font-size:0.8rem; padding:10px;">
-    📺 Tube Atlas OSS v1.1 · MIT License ·
+    📺 Tube Atlas OSS v1.2 · 13 tools + CLI + Claude Skill · MIT License ·
     <a href="https://github.com" style="color:#7c3aed; text-decoration:none;">GitHub</a>
     · Built with Streamlit + DeepSeek + YouTube Data API
 </div>

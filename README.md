@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-11%20features-7c3aed?style=for-the-badge" alt="11 features">
+<img src="https://img.shields.io/badge/Tools-13%20features%20%2B%20CLI-7c3aed?style=for-the-badge" alt="13 features + CLI">
 
 </div>
 
@@ -49,8 +49,22 @@
 | 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
 | 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
 | 🩺 | **Channel Audit** | Chấm điểm kênh 0-100 + recommendations | ✅ YouTube |
+| 🔥 | **Niche Pulse** | Briefing song song YT + Trends + Autocomplete + AI cho 1 topic trong 30 ngày | ✅ YouTube |
+| 🕵️ | **Competitor Discovery** | Auto tìm top 5 kênh đối thủ cùng niche | ✅ YouTube |
 
-> **6/11 tools hoạt động ngay** mà không cần API key nào!
+> **6/13 tools hoạt động ngay** mà không cần API key nào!
+
+### ✨ v1.2 highlights (mượn ý từ `/last30days-skill` + `agent-reach`)
+
+- **🔥 Niche Pulse** (page mới): quét **song song** YouTube (last 30d) + Google Trends + YouTube Autocomplete + top comments → DeepSeek tổng hợp briefing 5 mục (nhiệt độ chủ đề, format viral, keyword emerging, sentiment, 3 ý tưởng video). Cảm hứng từ [`/last30days-skill`](https://github.com/mvanhorn/last30days-skill) (24k⭐).
+- **🕵️ Competitor Discovery** (page mới): nhập 1 kênh seed → auto extract keywords top → song song search → rank top N kênh đối thủ cùng niche.
+- **🖥️ CLI `tube-atlas`** (cảm hứng `agent-reach`):
+  - `tube-atlas doctor` — check env + API probe + cache + deps
+  - `tube-atlas niche "review iphone 17" --days 30` — briefing ra markdown
+  - `tube-atlas audit @MrBeast` — chấm điểm kênh 0-100
+  - `tube-atlas competitors @MrBeast -n 5`
+  - `--json` flag cho mọi command, dễ pipe vào agent
+- **🧩 Claude Skill** (`skills/tube-atlas/SKILL.md`): dùng được trong Claude Code / Cursor / Gemini CLI qua CLI ở trên.
 
 ### ✨ v1.1 highlights (VidIQ-parity features)
 
@@ -76,11 +90,35 @@ pip install -r requirements.txt
 cp .env.example .env
 # Sửa .env → thêm YOUTUBE_API_KEY và DEEPSEEK_API_KEY
 
-# Chạy
+# Chạy dashboard
 streamlit run app.py
+
+# Hoặc dùng CLI
+pip install -e .
+tube-atlas doctor
+tube-atlas niche "review iphone 17" --days 30
+tube-atlas audit @MrBeast
 ```
 
 Mở browser tại **http://localhost:8501** 🎉
+
+---
+
+## 🖥️ CLI
+
+Sau `pip install -e .` bạn có lệnh `tube-atlas` trong PATH:
+
+```bash
+tube-atlas doctor                              # health check env + API
+tube-atlas niche "AI agent" --days 30          # briefing 30 ngày
+tube-atlas niche "crypto" --json --no-llm      # raw JSON cho agent
+tube-atlas audit @MrBeast --limit 100          # chấm kênh 0-100
+tube-atlas competitors @MrBeast -n 5 --json    # top 5 đối thủ
+tube-atlas cache stats                         # SQLite cache stats
+```
+
+Dùng được trong **Claude Code / Cursor / Gemini CLI** thông qua
+[`skills/tube-atlas/SKILL.md`](skills/tube-atlas/SKILL.md).
 
 ---
 

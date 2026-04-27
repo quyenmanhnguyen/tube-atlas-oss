@@ -22,20 +22,30 @@ def _client():
     return build("youtube", "v3", developerKey=key, cache_discovery=False)
 
 
-def search_videos(query: str, max_results: int = 25, region: str = "VN", order: str = "relevance") -> list[dict]:
-    key = _cache.make_key("search", q=query, n=max_results, r=region, o=order)
+def search_videos(
+    query: str,
+    max_results: int = 25,
+    region: str = "VN",
+    order: str = "relevance",
+    published_after: str | None = None,
+) -> list[dict]:
+    """Tìm video. published_after dùng ISO 8601 UTC, VD '2024-12-01T00:00:00Z'."""
+    key = _cache.make_key("search", q=query, n=max_results, r=region, o=order, pa=published_after)
     cached = _cache.get(key)
     if cached is not None:
         return cached
     yt = _client()
-    resp = yt.search().list(
+    params: dict[str, Any] = dict(
         q=query,
         part="snippet",
         type="video",
         maxResults=min(max_results, 50),
         regionCode=region,
         order=order,
-    ).execute()
+    )
+    if published_after:
+        params["publishedAfter"] = published_after
+    resp = yt.search().list(**params).execute()
     items = resp.get("items", [])
     _cache.set_(key, items, ttl=3 * 3600)
     return items
