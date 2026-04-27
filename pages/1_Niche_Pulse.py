@@ -134,7 +134,7 @@ tab_vid, tab_tags, tab_sug, tab_trends, tab_sent = st.tabs(
 
 with tab_vid:
     if videos:
-        df = pd.DataFrame(videos[:20])
+        df = pd.DataFrame(videos)
         df_show = df[["title", "channel", "views", "likes", "comments", "duration_s", "publishedAt", "url"]]
         st.dataframe(
             df_show,

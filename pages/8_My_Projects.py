@@ -31,7 +31,7 @@ with st.expander("➕ Thêm bookmark mới", expanded=False):
                 "channel": "@MrBeast hoặc UCX6OQ3DkcsbYNE6H8uQQuVA",
                 "niche": "review iphone 17",
                 "video": "https://youtube.com/watch?v=...",
-            }["channel"],
+            }[kind],
         )
         note = st.text_area("Ghi chú (tuỳ chọn)", height=80)
         ok = st.form_submit_button("Lưu bookmark", type="primary")
