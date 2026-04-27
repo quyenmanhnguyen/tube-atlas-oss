@@ -134,11 +134,12 @@ def cmd_niche(args: argparse.Namespace) -> int:
         include_llm=not args.no_llm,
         only_shorts=args.only_shorts,
     )
+    yt = data.get("youtube", {})
+    ok = isinstance(yt, dict) and "videos" in yt
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
-        return 0
-    yt = data.get("youtube", {})
-    if not isinstance(yt, dict) or "videos" not in yt:
+        return 0 if ok else 2
+    if not ok:
         print(f"❌ Lỗi YouTube fetch: {yt}", file=sys.stderr)
         return 2
     print(f"# 🔥 Niche Pulse: {topic}  ({args.days} ngày, region={args.region})\n")

@@ -155,8 +155,9 @@ with col3:
         yt_ok,   # Competitor Discovery
         ds_ok,   # Title & Script Studio
         True,    # Video → Text (fallback yt-dlp)
+        True,    # My Projects (local SQLite)
     ])
-    st.metric("Tools Available", f"{available}/7")
+    st.metric("Tools Available", f"{available}/8")
 
 if not yt_ok:
     with st.expander("⚙️ Cách lấy YouTube API Key (miễn phí, 2 phút)"):

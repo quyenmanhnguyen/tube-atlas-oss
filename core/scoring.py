@@ -45,7 +45,9 @@ def _score_upload_frequency(df: pd.DataFrame) -> tuple[float, str]:
     if gaps.empty:
         return 0.0, "Chỉ có 1 video"
     mean_gap = gaps.mean()
-    std_gap = gaps.std() or 1
+    std_gap = gaps.std()
+    if pd.isna(std_gap):
+        std_gap = 0.0
     # Ideal mean gap = 7 days (weekly). Punish > 14 days.
     if mean_gap <= 7:
         freq = 1.0
