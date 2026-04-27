@@ -209,5 +209,8 @@ def niche_pulse(
     if include_llm and isinstance(data.get("youtube"), dict) and "videos" in data["youtube"]:
         data["briefing"] = _synthesize_with_llm(topic, data, days)
 
-    cache.set_(cache_key, data, ttl=3600)
+    # Không cache nếu YouTube fetch bị lỗi (transient, tránh kẹt 1h)
+    yt_ok = isinstance(data.get("youtube"), dict) and "videos" in data["youtube"]
+    if yt_ok:
+        cache.set_(cache_key, data, ttl=3600)
     return data

@@ -183,12 +183,15 @@ def cmd_competitors(args: argparse.Namespace) -> int:
             return 2
         cid = ch["id"]
     data = _comp.discover_competitors(cid, region=args.region, top_n=args.n)
+    if "error" in data:
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(f"❌ {data['error']}", file=sys.stderr)
+        return 2
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
         return 0
-    if "error" in data:
-        print(f"❌ {data['error']}", file=sys.stderr)
-        return 2
     print(f"# 🕵️ Competitors cho {data['seed']['title']}\n")
     print("**Keywords:** " + ", ".join(f"`{k}`" for k in data.get("keywords", [])) + "\n")
     print("| # | Kênh | Subs | Videos | Matched kw | Score |")
