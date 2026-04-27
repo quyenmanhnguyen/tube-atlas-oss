@@ -129,7 +129,7 @@ st.markdown("""
     <span style="font-size:3rem;">📺</span>
     <h1 style="margin:0; font-size:2.5rem;">Tube Atlas OSS</h1>
     <p style="color:#94a3b8; font-size:1.1rem; margin-top:4px;">
-        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 7 tools + CLI · Streamlit + DeepSeek + YouTube API
+        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 8 tools + CLI · Streamlit + DeepSeek + YouTube API
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -155,9 +155,10 @@ with col3:
         yt_ok,   # Competitor Discovery
         ds_ok,   # Title & Script Studio
         True,    # Video → Text (fallback yt-dlp)
+        ds_ok,   # Long-form Studio
         True,    # My Projects (local SQLite)
     ])
-    st.metric("Tools Available", f"{available}/8")
+    st.metric("Tools Available", f"{available}/9")
 
 if not yt_ok:
     with st.expander("⚙️ Cách lấy YouTube API Key (miễn phí, 2 phút)"):
@@ -182,6 +183,7 @@ features = [
     ("🕵️", "Competitor Discovery", "Auto tìm top N đối thủ cùng niche", "YouTube", yt_ok),
     ("✨", "Title & Script Studio", "Sinh title · rewrite/spin · brainstorm ý tưởng", "DeepSeek", ds_ok),
     ("📝", "Video → Text", "Transcript / phụ đề (+ yt-dlp fallback)", "Không", True),
+    ("📝", "Long-form Studio", "Pipeline 5 bước: topic→title→outline→script→rewrite", "DeepSeek", ds_ok),
     ("📌", "My Projects", "Bookmark kênh, niche, video — local SQLite", "Không", True),
 ]
 
@@ -209,7 +211,7 @@ for i, (icon, name, desc, api, feature_available) in enumerate(features):
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center; color:#64748b; font-size:0.8rem; padding:10px;">
-    📺 Tube Atlas OSS v2.0 · 7 tools + CLI + Claude Skill · MIT License ·
+    📺 Tube Atlas OSS v2.2 · 8 tools + CLI + Claude Skill · MIT License ·
     <a href="https://github.com" style="color:#7c3aed; text-decoration:none;">GitHub</a>
     · Built with Streamlit + DeepSeek + YouTube Data API
 </div>
