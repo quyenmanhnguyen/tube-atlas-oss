@@ -40,8 +40,8 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     yt = os.getenv("YOUTUBE_API_KEY")
     ds = os.getenv("DEEPSEEK_API_KEY")
     print("\n🔑 Environment")
-    print(f"  YOUTUBE_API_KEY   : {'✅ set' if yt else '⚠️  missing (6/11 tools cần key này)'}")
-    print(f"  DEEPSEEK_API_KEY  : {'✅ set' if ds else '⚠️  missing (3/11 tools dùng LLM)'}")
+    print(f"  YOUTUBE_API_KEY   : {'✅ set' if yt else '⚠️  missing (8/13 tools cần key này)'}")
+    print(f"  DEEPSEEK_API_KEY  : {'✅ set' if ds else '⚠️  missing (3/13 tools dùng LLM)'}")
     if not yt or not ds:
         ok = False
 
@@ -140,6 +140,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
             return 2
         cid = ch["id"]
     uploads = _yt.channel_uploads_playlist(cid)
+    if not uploads:
+        print("❌ Kênh không có playlist uploads.", file=sys.stderr)
+        return 2
     ids = _yt.playlist_video_ids(uploads, max_videos=args.limit)
     details = _yt.videos_details(ids)
     rows = []
@@ -183,6 +186,9 @@ def cmd_competitors(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
         return 0
+    if "error" in data:
+        print(f"❌ {data['error']}", file=sys.stderr)
+        return 2
     print(f"# 🕵️ Competitors cho {data['seed']['title']}\n")
     print("**Keywords:** " + ", ".join(f"`{k}`" for k in data.get("keywords", [])) + "\n")
     print("| # | Kênh | Subs | Videos | Matched kw | Score |")

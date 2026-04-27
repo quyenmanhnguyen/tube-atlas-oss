@@ -182,7 +182,9 @@ def niche_pulse(
     include_llm: bool = True,
 ) -> dict[str, Any]:
     """Chạy full parallel research pipeline. Cache 1h."""
-    cache_key = cache.make_key("niche_pulse", t=topic, r=region, d=days, s=include_sentiment)
+    cache_key = cache.make_key(
+        "niche_pulse", t=topic, r=region, d=days, s=include_sentiment, l=include_llm
+    )
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -204,7 +206,7 @@ def niche_pulse(
     if include_sentiment and isinstance(data.get("youtube"), dict):
         data["sentiment"] = _fetch_comment_sentiment(data["youtube"].get("videos", []))
 
-    if include_llm:
+    if include_llm and isinstance(data.get("youtube"), dict) and "videos" in data["youtube"]:
         data["briefing"] = _synthesize_with_llm(topic, data, days)
 
     cache.set_(cache_key, data, ttl=3600)
