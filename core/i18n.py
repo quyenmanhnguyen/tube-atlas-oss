@@ -80,18 +80,98 @@ STRINGS: dict[str, dict[LangCode, str]] = {
                          "ja": "トピックからフックとCTA入りの完全な台本を生成。EN/KO/JA対応。",
                          "vi": "Một topic → full script (hook · body · CTA) tiếng EN/KO/JA."},
 
-    "studio_name":      {"en": "Title & Thumb Studio", "ko": "타이틀&썸네일 스튜디오", "ja": "タイトル&サムネ工房",  "vi": "Title & Thumb Studio"},
-    "studio_sub":       {"en": "CTR optimised",    "ko": "CTR 최적화",     "ja": "CTR最適化",              "vi": "Tối ưu CTR"},
-    "studio_desc":      {"en": "AI titles, hooks and overlay copy tuned for click-through.",
-                         "ko": "클릭률을 극대화하는 AI 타이틀·훅·썸네일 카피.",
-                         "ja": "クリック率を最大化するAIタイトル・フック・オーバーレイ。",
-                         "vi": "AI title, hook, thumbnail copy tối ưu CTR."},
+    "studio_name":      {"en": "Studio",           "ko": "스튜디오",       "ja": "スタジオ",               "vi": "Studio"},
+    "studio_sub":       {"en": "Topic → script",   "ko": "주제 → 스크립트", "ja": "テーマ → 台本",          "vi": "Topic → script"},
+    "studio_desc":      {"en": "Walk a topic through 5 steps — ideation, titles, 8-part outline, full long-form script, humanize rewrite.",
+                         "ko": "주제 하나를 5단계로 — 아이디어 · 타이틀 · 8파트 개요 · 풀 스크립트 · 사람처럼 리라이팅.",
+                         "ja": "テーマを5ステップで — アイデア・タイトル・8パート構成・台本・人間化リライト。",
+                         "vi": "Một topic đi qua 5 bước — ý tưởng · tiêu đề · outline 8 phần · script dài · rewrite tự nhiên."},
 
     "lang_label":       {"en": "Language",         "ko": "언어",           "ja": "言語",                   "vi": "Ngôn ngữ"},
     "api_yt":           {"en": "YouTube API",      "ko": "YouTube API",    "ja": "YouTube API",            "vi": "YouTube API"},
     "api_ds":           {"en": "DeepSeek AI",      "ko": "DeepSeek AI",    "ja": "DeepSeek AI",            "vi": "DeepSeek AI"},
     "api_active":       {"en": "Active",           "ko": "사용 가능",      "ja": "利用可能",               "vi": "Đã kết nối"},
     "api_missing":      {"en": "Missing",          "ko": "없음",           "ja": "未設定",                 "vi": "Thiếu"},
+
+    # Errors (rendered when sentinel exception is caught)
+    "err_missing_deepseek": {
+        "en": "DeepSeek API key missing — set DEEPSEEK_API_KEY ([get one](https://platform.deepseek.com/api_keys)).",
+        "ko": "DeepSeek API 키가 없습니다 — DEEPSEEK_API_KEY 설정 필요 ([발급](https://platform.deepseek.com/api_keys)).",
+        "ja": "DeepSeek APIキーがありません — DEEPSEEK_API_KEY を設定してください ([取得](https://platform.deepseek.com/api_keys)).",
+        "vi": "Thiếu DEEPSEEK_API_KEY — đặt biến môi trường ([lấy key](https://platform.deepseek.com/api_keys)).",
+    },
+    "err_missing_youtube": {
+        "en": "YouTube Data API key missing — set YOUTUBE_API_KEY ([get one](https://console.cloud.google.com/apis/credentials)).",
+        "ko": "YouTube API 키가 없습니다 — YOUTUBE_API_KEY 설정 필요 ([발급](https://console.cloud.google.com/apis/credentials)).",
+        "ja": "YouTube APIキーがありません — YOUTUBE_API_KEY を設定してください ([取得](https://console.cloud.google.com/apis/credentials)).",
+        "vi": "Thiếu YOUTUBE_API_KEY — đặt biến môi trường ([lấy key](https://console.cloud.google.com/apis/credentials)).",
+    },
+
+    # Pipeline / Send to Studio
+    "send_to_studio":   {"en": "→ Send to Studio",    "ko": "→ 스튜디오로 보내기", "ja": "→ スタジオへ送る", "vi": "→ Gửi sang Studio"},
+    "use_this_topic":   {"en": "Use this topic in Studio", "ko": "이 주제를 스튜디오에서 사용", "ja": "このテーマをスタジオで使う", "vi": "Dùng topic này trong Studio"},
+    "use_this_keyword": {"en": "Use this keyword in Studio", "ko": "이 키워드를 스튜디오에서 사용", "ja": "このキーワードをスタジオで使う", "vi": "Dùng keyword này trong Studio"},
+    "use_this_title":   {"en": "Use this title in Studio", "ko": "이 타이틀을 스튜디오에서 사용", "ja": "このタイトルをスタジオで使う", "vi": "Dùng title này trong Studio"},
+    "send_to_studio_hint": {
+        "en": "Studio will be prefilled with this. Click again to overwrite.",
+        "ko": "스튜디오가 이 값으로 채워집니다. 다시 클릭하면 덮어씁니다.",
+        "ja": "スタジオがこれで初期化されます。再度クリックで上書き。",
+        "vi": "Studio sẽ tự điền bằng giá trị này. Click lại để ghi đè.",
+    },
+
+    # Studio steps
+    "studio_step_label": {"en": "Step", "ko": "단계", "ja": "ステップ", "vi": "Bước"},
+    "studio_progress":  {"en": "Progress", "ko": "진행률", "ja": "進捗", "vi": "Tiến độ"},
+    "studio_back":      {"en": "← Back", "ko": "← 이전", "ja": "← 戻る", "vi": "← Quay lại"},
+    "studio_next":      {"en": "Next →", "ko": "다음 →", "ja": "次へ →", "vi": "Tiếp →"},
+    "studio_skip":      {"en": "Skip & paste my own", "ko": "건너뛰고 직접 입력", "ja": "スキップして自分で貼る", "vi": "Bỏ qua & dán của tôi"},
+    "studio_step1":     {"en": "1 · Topic ideas", "ko": "1 · 주제 아이디어", "ja": "1 · トピック案", "vi": "1 · Ý tưởng chủ đề"},
+    "studio_step2":     {"en": "2 · Titles", "ko": "2 · 타이틀", "ja": "2 · タイトル", "vi": "2 · Tiêu đề"},
+    "studio_step3":     {"en": "3 · 8-part outline", "ko": "3 · 8파트 개요", "ja": "3 · 8パート構成", "vi": "3 · Outline 8 phần"},
+    "studio_step4":     {"en": "4 · Long-form script", "ko": "4 · 롱폼 스크립트", "ja": "4 · 長尺台本", "vi": "4 · Script dài"},
+    "studio_step5":     {"en": "5 · Humanize rewrite", "ko": "5 · 사람처럼 리라이팅", "ja": "5 · 人間化リライト", "vi": "5 · Rewrite tự nhiên"},
+    "studio_seed_label": {"en": "Niche / seed keyword", "ko": "니치 / 시드 키워드", "ja": "ニッチ / シードキーワード", "vi": "Niche / từ khoá seed"},
+    "studio_run_step1": {"en": "Generate 20 topic ideas", "ko": "주제 아이디어 20개 생성", "ja": "20件のテーマ案を生成", "vi": "Tạo 20 ý tưởng"},
+    "studio_select_topic": {"en": "Select a topic to continue", "ko": "주제를 선택하여 계속", "ja": "テーマを選択して続ける", "vi": "Chọn topic để tiếp tục"},
+    "studio_pick_topic": {"en": "Pick this topic", "ko": "이 주제 선택", "ja": "このテーマを選ぶ", "vi": "Chọn topic này"},
+    "studio_picked":    {"en": "Picked", "ko": "선택됨", "ja": "選択済み", "vi": "Đã chọn"},
+    "studio_run_step2": {"en": "Generate 10 titles + top 3 CTR", "ko": "타이틀 10개 + CTR 상위 3 생성", "ja": "10タイトル + CTR上位3を生成", "vi": "Tạo 10 title + top 3 CTR"},
+    "studio_pick_title": {"en": "Pick this title", "ko": "이 타이틀 선택", "ja": "このタイトルを選ぶ", "vi": "Chọn title này"},
+    "studio_run_step3": {"en": "Build 8-part outline", "ko": "8파트 개요 만들기", "ja": "8パート構成を作る", "vi": "Tạo outline 8 phần"},
+    "studio_run_step4": {"en": "Write full long-form script", "ko": "풀 롱폼 스크립트 작성", "ja": "長尺台本を書く", "vi": "Viết full script dài"},
+    "studio_target_chars": {"en": "Target script length", "ko": "스크립트 길이 목표", "ja": "台本の目標文字数", "vi": "Độ dài mục tiêu"},
+    "studio_run_step5": {"en": "Humanize rewrite", "ko": "사람처럼 리라이팅", "ja": "人間化リライト", "vi": "Rewrite cho tự nhiên"},
+    "studio_download_md": {"en": "Download .md", "ko": ".md 다운로드", "ja": ".md をダウンロード", "vi": "Tải .md"},
+    "studio_chars":     {"en": "characters", "ko": "자", "ja": "文字", "vi": "ký tự"},
+    "studio_top3":      {"en": "TOP 3 CTR", "ko": "상위 3 CTR", "ja": "TOP 3 CTR", "vi": "TOP 3 CTR"},
+    "studio_paste_hint": {"en": "Already have one? Paste below to skip ahead.",
+                          "ko": "이미 정한 것이 있나요? 아래에 붙여넣어 건너뛰세요.",
+                          "ja": "決まったものがあれば下に貼ってスキップ。",
+                          "vi": "Đã có sẵn? Dán bên dưới để bỏ qua bước này."},
+
+    # Niche Finder upgrade
+    "niche_opportunity": {"en": "Opportunity score", "ko": "기회 점수", "ja": "機会スコア", "vi": "Điểm cơ hội"},
+    "niche_recent_uploads": {"en": "Uploads (last 14d)", "ko": "최근 14일 업로드", "ja": "直近14日の投稿", "vi": "Upload 14 ngày qua"},
+    "niche_competition": {"en": "Total competition", "ko": "전체 경쟁", "ja": "総競合数", "vi": "Tổng cạnh tranh"},
+    "niche_breakouts":  {"en": "Breakout videos (outliers)", "ko": "급성장 영상 (이상치)", "ja": "急上昇動画（外れ値）", "vi": "Video bứt phá (outlier)"},
+    "niche_no_breakouts": {"en": "No clear breakout videos in this sample.",
+                            "ko": "이 샘플에서는 뚜렷한 급성장 영상이 없습니다.",
+                            "ja": "このサンプルでは明確な急上昇動画はありません。",
+                            "vi": "Không có video bứt phá rõ ràng trong mẫu này."},
+
+    # Keyword Finder upgrade
+    "kw_kgr_score":     {"en": "Ease-to-rank", "ko": "랭크 난이도", "ja": "ランク難易度", "vi": "Dễ rank"},
+    "kw_competition":   {"en": "Competition", "ko": "경쟁", "ja": "競合", "vi": "Cạnh tranh"},
+    "kw_question_buckets": {"en": "Question keywords (high-intent)", "ko": "질문형 키워드 (고의도)", "ja": "質問キーワード（高意図）", "vi": "Keyword dạng câu hỏi (intent cao)"},
+    "kw_compute_kgr":   {"en": "Compute competition + KGR (uses YouTube quota)",
+                          "ko": "경쟁 + KGR 계산 (YouTube 쿼터 사용)",
+                          "ja": "競合 + KGR を計算（YouTubeクォータ使用）",
+                          "vi": "Tính competition + KGR (dùng quota YouTube)"},
+
+    # Cloner upgrade
+    "cloner_detected_lang": {"en": "Detected language", "ko": "감지된 언어", "ja": "検出された言語", "vi": "Ngôn ngữ phát hiện"},
+    "cloner_override_lang": {"en": "Override output language", "ko": "출력 언어 강제 지정", "ja": "出力言語の上書き", "vi": "Ép ngôn ngữ output"},
+    "cloner_lang_auto":     {"en": "auto (use detected)", "ko": "자동 (감지된 값 사용)", "ja": "自動（検出値を使用）", "vi": "tự động (theo phát hiện)"},
 }
 
 

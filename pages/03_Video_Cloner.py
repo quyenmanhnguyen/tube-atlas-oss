@@ -1,8 +1,12 @@
 """Video Cloner — reverse-engineer a competitor video into a reusable kit.
 
 Input: a YouTube URL.
-Output: fingerprint + hook & structure analysis + 10 title clones + full
-script clone + thumbnail copy suggestions, all in the chosen language.
+Output: fingerprint + hook & structure analysis + N title clones + full
+script clone + thumbnail copy suggestions, in the **language of the source
+video** (auto-detected from the transcript). The user can override.
+
+Each title clone has a "→ Send to Studio" button that drops it into the
+5-step Studio wizard.
 """
 from __future__ import annotations
 
@@ -10,8 +14,8 @@ import json
 
 import streamlit as st
 
-from core import llm, transcript, youtube as yt
-from core.i18n import language_label, language_selector, t
+from core import lang_detect, llm, transcript, youtube as yt
+from core.i18n import LANG_FULL_NAME, language_label, language_selector, t
 from core.theme import inject, page_header
 from core.utils import engagement_rate, humanize_int, parse_iso_duration
 
@@ -25,13 +29,47 @@ page_header(
     subtitle=t("cloner_desc"),
 )
 
+if st.session_state.pop("_goto_studio", False):
+    st.switch_page("pages/04_Studio.py")
+
+
+def _send_title_to_studio(value: str) -> None:
+    st.session_state["studio_title_in"] = value
+    st.session_state["_goto_studio"] = True
+
+
+def _send_topic_to_studio(value: str) -> None:
+    st.session_state["studio_topic_in"] = value
+    st.session_state["_goto_studio"] = True
+
+
+def _missing_key_render(exc: Exception) -> bool:
+    if isinstance(exc, RuntimeError) and llm.ERR_NO_DEEPSEEK_KEY in str(exc):
+        st.error(t("err_missing_deepseek"))
+        return True
+    return False
+
+
 with st.form("clone"):
     url = st.text_input("YouTube video URL", placeholder="https://www.youtube.com/watch?v=…")
     new_topic = st.text_input(
         "New topic for the clone (optional)",
         placeholder="leave empty to keep the same topic, or e.g. 'protein for cyclists'",
     )
-    n_titles = st.slider("# of title clones", 5, 20, 10)
+    c1, c2 = st.columns(2)
+    with c1:
+        n_titles = st.slider("# of title clones", 5, 20, 10)
+    with c2:
+        override_options = [("auto", t("cloner_lang_auto"))] + [
+            (code, name) for code, name in LANG_FULL_NAME.items()
+        ]
+        override_idx = st.selectbox(
+            t("cloner_override_lang"),
+            range(len(override_options)),
+            format_func=lambda i: override_options[i][1],
+            index=0,
+        )
+        override_code = override_options[override_idx][0]
     run = st.form_submit_button("Clone this video", type="primary")
 
 if not (run and url.strip()):
@@ -75,7 +113,7 @@ if tags:
     with st.expander(f"🏷 Tags ({len(tags)})"):
         st.write(" · ".join(f"`{t_}`" for t_ in tags))
 
-# ─── Transcript ───────────────────────────────────────────────────────────────
+# ─── Transcript + language detect ─────────────────────────────────────────────
 st.subheader("📜  Transcript & hook analysis")
 try:
     segments = transcript.fetch_transcript(vid, languages=["en", "ko", "ja", "vi"])
@@ -87,8 +125,19 @@ except Exception as e:
 if not full_text:
     st.info("No transcript available — title-only clone will be generated.")
 
-lang_label = language_label()
-clipped = full_text[:8000]  # keep prompt size sane
+# Auto-detect language from transcript (fallback to title if empty).
+detected = lang_detect.detect_lang(full_text or sn["title"])
+if override_code == "auto":
+    out_code = detected
+else:
+    out_code = override_code  # type: ignore[assignment]
+
+c1, c2 = st.columns(2)
+c1.metric(t("cloner_detected_lang"), LANG_FULL_NAME[detected])
+c2.metric("Output language", LANG_FULL_NAME[out_code])
+
+lang_label_str = language_label(out_code)
+clipped = full_text[:8000]
 
 # ─── DeepSeek clone kit ───────────────────────────────────────────────────────
 sys = (
@@ -107,7 +156,7 @@ sys = (
     " ≤6 words each, high-impact),\n"
     ' "tags": [str] (12 SEO tags relevant to the new topic)\n'
     "}.\n"
-    f"Write hook_analysis, script, title_clones, thumbnail_copy and tags in {lang_label}."
+    f"Write hook_analysis, script, title_clones, thumbnail_copy and tags in {lang_label_str}."
 )
 
 prompt_payload = {
@@ -127,19 +176,30 @@ with st.spinner("DeepSeek cloning…"):
         raw = llm.chat_json(json.dumps(prompt_payload, ensure_ascii=False), system=sys)
         kit = json.loads(raw)
     except Exception as e:
-        st.error(f"Clone kit failed: {e}")
+        if not _missing_key_render(e):
+            st.error(f"Clone kit failed: {e}")
         st.stop()
 
 # Hook
 st.markdown(kit.get("hook_analysis", ""))
 
-# Title clones
+# Title clones — each row gets a "Send to Studio" button.
 st.subheader("🎯  Title clones")
 titles = kit.get("title_clones", [])[:n_titles]
 for i, ttl in enumerate(titles, 1):
     with st.container(border=True):
-        st.markdown(f"**{i:02d}.** {ttl}")
-        st.caption(f"📏 {len(ttl)} chars")
+        cA, cB = st.columns([5, 1])
+        with cA:
+            st.markdown(f"**{i:02d}.** {ttl}")
+            st.caption(f"📏 {len(ttl)} chars")
+        with cB:
+            st.button(
+                t("send_to_studio"),
+                key=f"clone_sts_{i}",
+                use_container_width=True,
+                on_click=_send_title_to_studio,
+                args=(ttl,),
+            )
 
 # Script
 st.subheader("📝  Cloned script")
@@ -160,3 +220,14 @@ tags_out = kit.get("tags", [])
 if tags_out:
     st.subheader("🏷  Suggested tags")
     st.write(" · ".join(f"`{t_}`" for t_ in tags_out))
+
+# Pipeline handoff at the bottom: send the *new topic* (or original title) to Studio.
+st.markdown("---")
+handoff_seed = new_topic.strip() or sn["title"]
+st.button(
+    f"🎬  {t('use_this_topic')} — {handoff_seed[:60]}",
+    type="primary",
+    key="clone_handoff_topic",
+    on_click=_send_topic_to_studio,
+    args=(handoff_seed,),
+)

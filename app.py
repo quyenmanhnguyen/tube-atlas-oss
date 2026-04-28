@@ -92,19 +92,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-c1, c2, _spacer = st.columns([1, 1, 1], gap="large")
+c1, _s1, _s2 = st.columns([1, 1, 1], gap="large")
 with c1:
     st.markdown(
-        _feature_card("04", "✍", t("script_name"), t("script_sub"), t("script_desc")),
+        _feature_card("04", "🎬", t("studio_name"), t("studio_sub"), t("studio_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/04_Script_Writer.py", label=t("card_open") + " →")
-with c2:
-    st.markdown(
-        _feature_card("05", "✨", t("studio_name"), t("studio_sub"), t("studio_desc")),
-        unsafe_allow_html=True,
-    )
-    st.page_link("pages/05_Title_Studio.py", label=t("card_open") + " →")
+    st.page_link("pages/04_Studio.py", label=t("card_open") + " →")
 
 # ─── API status (compact, footer) ─────────────────────────────────────────────
 st.markdown("&nbsp;")
