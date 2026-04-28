@@ -1,4 +1,4 @@
-"""Video Analyzer — 1 video, 4 tab: Overview / SEO Score / Comments / Remix."""
+"""🎬 Video Lab — Stats + SEO + Sentiment + Remix + Transcript trong 1 page (5 tabs)."""
 from __future__ import annotations
 
 import json
@@ -8,16 +8,15 @@ import streamlit as st
 
 from core import comments as _comments
 from core import remix as _remix
+from core import transcript
 from core import youtube as yt
 from core.scoring import video_seo_score
+from core.theme import inject
 from core.utils import engagement_rate, humanize_int, parse_iso_duration
 
-# st.set_page_config moved to app.py (st.navigation entrypoint)
-from core.theme import inject  # noqa: E402
-
 inject()
-st.title("🎬 Video Analyzer")
-st.caption("Stats + SEO score + sentiment khán giả cho 1 video.")
+st.title("🎬 Video Lab")
+st.caption("Phân tích 1 video sâu — stats · SEO · sentiment · remix prompt · transcript.")
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -26,9 +25,15 @@ try:
 except Exception:
     _VADER = None
 
-url = st.text_input("URL hoặc Video ID", placeholder="https://www.youtube.com/watch?v=...")
+
+url = st.text_input(
+    "URL hoặc Video ID",
+    placeholder="https://www.youtube.com/watch?v=...",
+    key="vid_url",
+)
 
 if not url:
+    st.info("Nhập URL hoặc Video ID để bắt đầu.")
     st.stop()
 
 try:
@@ -47,10 +52,14 @@ sn = v["snippet"]
 stats = v.get("statistics", {})
 cd = v["contentDetails"]
 
-# Header
+# ─── Header ──────────────────────────────────────────────────────────────────
 c1, c2 = st.columns([1, 2])
 with c1:
-    thumb = sn["thumbnails"].get("maxres") or sn["thumbnails"].get("high") or sn["thumbnails"].get("default")
+    thumb = (
+        sn["thumbnails"].get("maxres")
+        or sn["thumbnails"].get("high")
+        or sn["thumbnails"].get("default")
+    )
     if thumb:
         st.image(thumb["url"])
 with c2:
@@ -59,7 +68,8 @@ with c2:
         f"**Kênh:** [{sn['channelTitle']}](https://youtube.com/channel/{sn['channelId']})"
     )
     st.markdown(
-        f"**Đăng:** {sn['publishedAt'][:10]}  ·  **Thời lượng:** {parse_iso_duration(cd['duration'])}"
+        f"**Đăng:** {sn['publishedAt'][:10]}  ·  "
+        f"**Duration:** {parse_iso_duration(cd['duration'])}"
     )
     views = int(stats.get("viewCount", 0))
     likes = int(stats.get("likeCount", 0))
@@ -70,42 +80,45 @@ with c2:
     m3.metric("Comments", humanize_int(comment_n))
     m4.metric("Engagement", f"{engagement_rate(views, likes, comment_n):.2f}%")
 
-tab_over, tab_seo, tab_cmt, tab_remix = st.tabs(
-    ["📋 Overview", "🎯 SEO Score", "💬 Comments & Sentiment", "🎨 Remix / Clone"]
+tab_over, tab_seo, tab_cmt, tab_remix, tab_tx = st.tabs(
+    ["📋 Overview", "🎯 SEO Score", "💬 Sentiment", "🎨 Remix / Clone", "📝 Transcript"]
 )
 
-# ---------- Overview ----------
+
+# ╔══════════════ TAB 1 — Overview ══════════════╗
 with tab_over:
-    with st.expander("Mô tả", expanded=False):
+    with st.expander("📝 Mô tả", expanded=False):
         st.write(sn.get("description", ""))
     tags = sn.get("tags", [])
     if tags:
-        st.subheader(f"Tags ({len(tags)})")
+        st.subheader(f"🏷️ Tags ({len(tags)})")
         st.write(" · ".join(f"`{t}`" for t in tags))
     else:
         st.info("Video không có tags.")
     topics = v.get("topicDetails", {}).get("topicCategories", [])
     if topics:
-        st.subheader("Topic categories")
+        st.subheader("📚 Topic categories")
         for t in topics:
             st.markdown(f"- {t}")
 
-# ---------- SEO Score ----------
+
+# ╔══════════════ TAB 2 — SEO Score ══════════════╗
 with tab_seo:
     result = video_seo_score(v)
     st.metric("SEO Score", f"{result['total']}/100", result["grade"])
     st.progress(min(result["total"] / 100, 1.0))
-    df = pd.DataFrame(result["parts"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    df_seo = pd.DataFrame(result["parts"])
+    st.dataframe(df_seo, use_container_width=True, hide_index=True)
     st.subheader("Khuyến nghị")
     for rec in result["recommendations"]:
         st.markdown(f"- {rec}")
 
-# ---------- Comments & Sentiment ----------
+
+# ╔══════════════ TAB 3 — Comments & Sentiment ══════════════╗
 with tab_cmt:
     limit = st.slider("Số comment lấy", 20, 300, 100, step=20, key="cmt_limit")
     sort = st.selectbox("Sắp xếp", ["popular", "recent"], key="cmt_sort")
-    if st.button("Lấy comments", type="primary"):
+    if st.button("Lấy comments", type="primary", key="btn_cmt"):
         with st.spinner("Đang tải comments..."):
             try:
                 cs = _comments.fetch_comments(v["id"], limit=limit, sort=sort)
@@ -113,10 +126,9 @@ with tab_cmt:
                 st.error(f"Lỗi: {e}")
                 cs = []
         if not cs:
-            st.warning("Không lấy được comments (video có thể tắt comment hoặc bị block).")
+            st.warning("Không lấy được comments.")
         else:
             st.success(f"Đã lấy {len(cs)} comments.")
-            # Sentiment
             if _VADER is None:
                 st.info("VADER chưa cài, bỏ qua sentiment.")
             else:
@@ -155,12 +167,13 @@ with tab_cmt:
                     mime="text/csv",
                 )
 
-# ---------- Remix / Clone ----------
+
+# ╔══════════════ TAB 4 — Remix / Clone ══════════════╗
 with tab_remix:
     st.markdown(
-        "Sinh **creative brief** để bạn tự remix video này: góc nhìn khác, "
-        "story outline, prompt ảnh thumbnail (Midjourney/DALL-E/Flux), scene b-roll, tags. "
-        "Một lệnh DeepSeek, không copy nội dung gốc — giữ identity của bạn."
+        "Sinh **creative brief** để remix video này — góc nhìn khác, story outline, "
+        "prompt thumbnail (Midjourney/DALL-E/Flux), prompt scene b-roll, tags. "
+        "1 lệnh DeepSeek, không copy nội dung gốc."
     )
     rc1, rc2, rc3 = st.columns(3)
     style = rc1.selectbox(
@@ -179,8 +192,11 @@ with tab_remix:
         "Aspect ratio", ["16:9", "9:16 (Shorts)", "1:1"], key="remix_aspect"
     )
     lang = rc3.selectbox(
-        "Ngôn ngữ brief", ["Tiếng Việt", "English"], key="remix_lang"
+        "Ngôn ngữ brief",
+        ["Tiếng Việt", "English", "日本語", "한국어"],
+        key="remix_lang",
     )
+
     if st.button("✨ Sinh Remix Brief", type="primary", key="remix_go"):
         meta = {
             "title": sn.get("title", ""),
@@ -200,7 +216,9 @@ with tab_remix:
                 st.error(f"Lỗi: {e}")
                 st.stop()
 
-        st.success(f"Niche: **{brief.get('niche', '—')}** · {brief.get('why_viral', '')}")
+        st.success(
+            f"Niche: **{brief.get('niche', '—')}** · {brief.get('why_viral', '')}"
+        )
 
         st.subheader("🎯 5 góc nhìn remix")
         for i, a in enumerate(brief.get("remix_angles", []), 1):
@@ -219,24 +237,30 @@ with tab_remix:
 
         st.subheader("🖼️ 3 Thumbnail prompt")
         for i, t in enumerate(brief.get("thumbnail_prompts", []), 1):
-            with st.expander(f"Thumbnail {i} — {t.get('style', '')} / {t.get('emotion', '')}"):
+            with st.expander(
+                f"Thumbnail {i} — {t.get('style', '')} / {t.get('emotion', '')}"
+            ):
                 meta_cols = st.columns(4)
                 meta_cols[0].markdown(f"**Style**\n\n{t.get('style', '')}")
-                meta_cols[1].markdown(f"**Composition**\n\n{t.get('composition', '')}")
+                meta_cols[1].markdown(
+                    f"**Composition**\n\n{t.get('composition', '')}"
+                )
                 meta_cols[2].markdown(f"**Lighting**\n\n{t.get('lighting', '')}")
                 meta_cols[3].markdown(f"**Text**\n\n{t.get('text_overlay', '')}")
                 st.code(t.get("prompt", ""), language="text")
 
         st.subheader("🎬 5 Scene / B-roll prompt")
         for i, s in enumerate(brief.get("scene_prompts", []), 1):
-            with st.expander(f"Scene {i}: {s.get('scene', '')} ({s.get('duration_sec', 0)}s)"):
+            with st.expander(
+                f"Scene {i}: {s.get('scene', '')} ({s.get('duration_sec', 0)}s)"
+            ):
                 st.code(s.get("prompt", ""), language="text")
                 st.markdown(f"**Stock alt:** {s.get('broll_alternative', '')}")
 
-        tags = brief.get("suggested_tags", [])
-        if tags:
-            st.subheader(f"🏷️ Tags gợi ý ({len(tags)})")
-            st.write(" · ".join(f"`{t}`" for t in tags))
+        rtags = brief.get("suggested_tags", [])
+        if rtags:
+            st.subheader(f"🏷️ Tags gợi ý ({len(rtags)})")
+            st.write(" · ".join(f"`{t}`" for t in rtags))
 
         tips = brief.get("differentiation_tips", [])
         if tips:
@@ -258,3 +282,43 @@ with tab_remix:
             file_name=f"remix_{v['id']}.json",
             mime="application/json",
         )
+
+
+# ╔══════════════ TAB 5 — Transcript ══════════════╗
+with tab_tx:
+    st.markdown("Lấy transcript / phụ đề YouTube (kể cả auto-caption).")
+    langs = st.multiselect(
+        "Ngôn ngữ ưu tiên",
+        ["vi", "en", "ja", "ko", "zh-Hans", "zh-Hant", "fr", "es"],
+        default=["en", "vi", "ja", "ko"],
+        key="tx_langs",
+    )
+    if st.button("📝 Lấy transcript", type="primary", key="btn_tx"):
+        try:
+            with st.spinner("Đang lấy transcript..."):
+                segs = transcript.fetch_transcript(v["id"], languages=langs)
+        except Exception as e:
+            st.error(f"Lỗi: {e}")
+            segs = []
+        if not segs:
+            st.warning("Video không có phụ đề.")
+        else:
+            t1, t2, t3 = st.tabs(["Plain text", "SRT", "Segments"])
+            with t1:
+                txt = transcript.transcript_to_text(segs)
+                st.text_area("Transcript", txt, height=400)
+                st.download_button(
+                    "⬇️ Tải .txt",
+                    txt.encode("utf-8"),
+                    file_name=f"{v['id']}.txt",
+                )
+            with t2:
+                srt = transcript.transcript_to_srt(segs)
+                st.code(srt[:5000])
+                st.download_button(
+                    "⬇️ Tải .srt",
+                    srt.encode("utf-8"),
+                    file_name=f"{v['id']}.srt",
+                )
+            with t3:
+                st.dataframe(segs, use_container_width=True, hide_index=True)

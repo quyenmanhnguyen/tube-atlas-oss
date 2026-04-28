@@ -68,20 +68,19 @@ for tab, k in zip(tabs, kinds):
                     if k == "channel":
                         handle = item["value"].lstrip("@")
                         st.markdown(
-                            "👉 [📊 Analyzer](/Channel_Analyzer)  ·  "
-                            "[🩺 Audit](/Channel_Audit)  ·  "
-                            "[🕵️ Competitors](/Competitor_Discovery)  ·  "
+                            "👉 [🩺 Channel Insights](/Channel_Insights)  ·  "
+                            "[🔍 Research Hub](/Research_Hub)  ·  "
                             f"[▶️ YouTube](https://youtube.com/@{handle})"
                         )
                     elif k == "niche":
                         st.markdown(
-                            "👉 [🔥 Mở Niche Pulse](/Niche_Pulse)  "
-                            "rồi dán topic vào form."
+                            "👉 [🔍 Research Hub](/Research_Hub)  "
+                            "rồi paste topic vào tab Niche Pulse."
                         )
                     else:
                         st.markdown(
-                            "👉 [🎬 Mở Video Analyzer](/Video_Analyzer)  ·  "
-                            "[📝 Transcript](/Video_To_Text)"
+                            "👉 [🎬 Video Lab](/Video_Lab)  "
+                            "(stats · SEO · sentiment · remix · transcript)"
                         )
                 with col3:
                     if st.button("🗑️", key=f"del_{item['id']}"):
