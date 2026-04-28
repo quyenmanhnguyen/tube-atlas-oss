@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.egg-info
+.eggs
+build
+dist
+
+# Virtualenvs
+.venv
+venv
+env
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Tests / docs / CI
+tests
+*.md
+!README.md
+LICENSE
+ruff.toml
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Cache / temp
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.log
+*.csv

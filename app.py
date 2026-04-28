@@ -4,6 +4,8 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
+from core.theme import inject
+
 load_dotenv()
 
 st.set_page_config(
@@ -13,115 +15,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Premium CSS ──
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+inject()
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f0f1a 0%, #1a1040 100%) !important;
-    border-right: 1px solid #2d2d50;
-}
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    color: #c4b5fd;
-}
-
-/* Cards / metrics */
-[data-testid="stMetric"] {
-    background: linear-gradient(135deg, #1e1e3a 0%, #252050 100%);
-    border: 1px solid #2d2d50;
-    border-radius: 12px;
-    padding: 16px 20px;
-    box-shadow: 0 4px 20px rgba(124,58,237,0.08);
-}
-[data-testid="stMetricValue"] {
-    font-size: 1.6rem !important;
-    font-weight: 700 !important;
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-/* Buttons */
-.stButton > button {
-    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(124,58,237,0.3) !important;
-}
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 25px rgba(124,58,237,0.5) !important;
-}
-
-/* Form / inputs */
-[data-testid="stForm"] {
-    background: #181830;
-    border: 1px solid #2d2d50;
-    border-radius: 12px;
-    padding: 20px;
-}
-input, textarea, [data-baseweb="select"] {
-    border-radius: 8px !important;
-}
-
-/* Dataframes */
-[data-testid="stDataFrame"] {
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid #2d2d50;
-}
-
-/* Expander */
-[data-testid="stExpander"] {
-    background: #181830;
-    border: 1px solid #2d2d50;
-    border-radius: 12px;
-}
-
-/* Download button */
-.stDownloadButton > button {
-    background: linear-gradient(135deg, #059669, #10b981) !important;
-}
-
-/* Header styling */
-h1 {
-    background: linear-gradient(135deg, #a855f7, #7c3aed, #6d28d9);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 800 !important;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f0f1a; }
-::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 3px; }
-
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 4px;
-    background: #181830;
-    border-radius: 10px;
-    padding: 4px;
-}
-.stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    font-weight: 600;
-}
-
-/* Toast / alerts */
-[data-testid="stAlert"] {
-    border-radius: 10px;
-    border-left: 4px solid #7c3aed;
-}
-</style>
-""", unsafe_allow_html=True)
+# Sidebar gradient (specific to dashboard, not in shared theme).
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f0f1a 0%, #1a1040 100%) !important;
+        border-right: 1px solid #2d2d50;
+    }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #c4b5fd;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ── Header ──
 st.markdown("""

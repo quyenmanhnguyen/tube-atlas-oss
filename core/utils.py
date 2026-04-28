@@ -39,3 +39,30 @@ def engagement_rate(views: int, likes: int, comments: int) -> float:
     if views <= 0:
         return 0.0
     return (likes + comments) / views * 100
+
+
+_SUFFIX_MULT = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}
+
+
+def parse_count(value: object) -> int:
+    """Parse compact human counts like ``"1.2K"`` / ``"3M"`` to int.
+
+    Returns 0 on empty / unrecognised input.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    s = str(value).strip().replace(",", "")
+    if not s:
+        return 0
+    suffix = s[-1].lower()
+    if suffix in _SUFFIX_MULT:
+        try:
+            return int(float(s[:-1]) * _SUFFIX_MULT[suffix])
+        except ValueError:
+            return 0
+    try:
+        return int(float(s))
+    except ValueError:
+        return 0
