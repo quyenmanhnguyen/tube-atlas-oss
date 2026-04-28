@@ -39,7 +39,9 @@ AI_TELL_PHRASES_KR = [
 
 
 def _split_sentences(text: str) -> list[str]:
-    sents = re.split(r"(?<=[.!?。！？])\s+|\n+", text.strip())
+    # Split at Latin punctuation requires whitespace, but CJK punctuation
+    # (。！？) often has no following space — split with zero-width.
+    sents = re.split(r"(?<=[.!?])\s+|(?<=[。！？])\s*|\n+", text.strip())
     return [s.strip() for s in sents if s.strip()]
 
 
@@ -98,6 +100,7 @@ def lexical_diversity(text: str) -> float:
     tokens = _tokenize(text)
     if len(tokens) < 50:
         return 50.0
+    cjk = _is_cjk_heavy(text)
     # type-token ratio over a sliding window of 100 tokens (more stable)
     window = 100
     ratios = []
@@ -107,7 +110,11 @@ def lexical_diversity(text: str) -> float:
     if not ratios:
         ratios = [len(set(tokens)) / len(tokens)]
     avg = statistics.mean(ratios)
-    # human ~0.65-0.75, AI ~0.55-0.65
+    if cjk:
+        # CJK char-level tokens have lower TTR by nature; recalibrate.
+        # human ~0.45-0.55, AI ~0.30-0.40
+        return min(100.0, max(0.0, (avg - 0.25) * 350))
+    # human ~0.65-0.75, AI ~0.55-0.65 (English word-level)
     return min(100.0, max(0.0, (avg - 0.45) * 250))
 
 
@@ -116,17 +123,23 @@ def ngram_repetition_score(text: str) -> float:
     tokens = _tokenize(text)
     if len(tokens) < 20:
         return 50.0
+    cjk = _is_cjk_heavy(text)
+    # CJK char-level tokens generate naturally repeating bigrams from
+    # grammatical particles (は が の を etc.). Raise count thresholds + reduce
+    # multiplier so the score stays in a meaningful range.
+    bg_min = 4 if cjk else 2
+    tg_min = 2 if cjk else 1
+    multiplier = 3.0 if cjk else 8.0
     bigrams = _ngrams(tokens, 2)
     trigrams = _ngrams(tokens, 3)
     if not bigrams or not trigrams:
         return 50.0
     bg_counts = Counter(bigrams)
     tg_counts = Counter(trigrams)
-    repeat_bg = sum(c for c in bg_counts.values() if c > 2)
-    repeat_tg = sum(c for c in tg_counts.values() if c > 1)
+    repeat_bg = sum(c for c in bg_counts.values() if c > bg_min)
+    repeat_tg = sum(c for c in tg_counts.values() if c > tg_min)
     repeat_ratio = (repeat_bg + 2 * repeat_tg) / max(1, len(tokens))
-    # human < 0.05, AI > 0.1
-    return min(100.0, max(0.0, (1 - repeat_ratio * 8) * 100))
+    return min(100.0, max(0.0, (1 - repeat_ratio * multiplier) * 100))
 
 
 def starter_homogeneity(text: str) -> float:
