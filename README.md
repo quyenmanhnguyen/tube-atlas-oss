@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-5%20focused%20features-7c3aed?style=for-the-badge" alt="5 focused features">
+<img src="https://img.shields.io/badge/Tools-4%20focused%20features-7c3aed?style=for-the-badge" alt="4 focused features">
 
 </div>
 
@@ -36,24 +36,45 @@
 
 ## ✨ Features
 
-Five focused tools, organised in two tracks:
+Four focused tools, wired together as a **single seamless pipeline**: discover a niche or keyword → drop it into Studio → walk it through Topic → Title → Outline → Script → Humanize Rewrite. No copy-pasting between tools.
 
 ### Research
 
 | # | Tool | What it does | API keys |
 |---|---|---|---|
-| 01 | **Niche Finder** | Trends + long-tail keywords + top channels + audience sentiment + AI verdict on whether the niche is hot/warm/cold. | YouTube + DeepSeek |
-| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete (optional A–Z expansion). | None |
-| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, 10 title clones, full script clone, thumbnail copy & SEO tags. | YouTube + DeepSeek |
+| 01 | **Niche Finder** | Trends + long-tail keywords + top channels + **outlier (breakout) detection** + **opportunity score** + audience sentiment + AI verdict on whether the niche is hot/warm/cold. | YouTube + DeepSeek |
+| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete + **KGR-style ease-to-rank score** (optional, hits YouTube quota) + **question buckets** (`how/what/why/when/where`). | None / YouTube |
+| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, N title clones, full script clone, thumbnail copy & SEO tags — **auto-detects the source video's language** and emits the kit in the same language. | YouTube + DeepSeek |
 
 ### Create
 
 | # | Tool | What it does | API keys |
 |---|---|---|---|
-| 04 | **Script Writer** | Topic → full YouTube script (hook · body · CTA) in EN/KO/JA/VI. | DeepSeek |
-| 05 | **Title & Thumbnail Studio** | CTR-optimised titles, spoken hooks and thumbnail overlay copy. | DeepSeek |
+| 04 | **Studio** | 5-step wizard: ① 20 topic ideas → ② 10 titles (top 3 CTR marked) → ③ 8-part long-form outline (Hook · Empathy · Problem 1 · Small Change · Story · Problems 2&3 · Reflection · CTA) → ④ full long-form script (chunked, up to 24,000 chars) → ⑤ humanize rewrite. State persists across steps; Niche / Keyword / Cloner can prefill any step via **"→ Send to Studio"**. | DeepSeek |
 
-UI and AI output respect the language picker (English / 한국어 / 日本語 / Tiếng Việt) in the sidebar.
+UI and AI output respect the language picker (English / 한국어 / 日本語 / Tiếng Việt) in the sidebar — and Video Cloner overrides it with the source video's detected language unless you force otherwise.
+
+### Pipeline diagram
+
+```
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│ 01 Niche Finder │   │ 02 Keyword Find │   │ 03 Video Cloner │
+│ • opportunity   │   │ • KGR score     │   │ • lang detect   │
+│ • breakouts     │   │ • question buck │   │ • title clones  │
+└────────┬────────┘   └────────┬────────┘   └────────┬────────┘
+         │                     │                     │
+         └──── → Send to Studio (prefills seed/topic/title) ────┘
+                              │
+                              ▼
+                ┌──────────────────────────────┐
+                │      04 Studio (5 steps)     │
+                │ ① Topic ideas (×20)          │
+                │ ② Titles (×10 + top-3 CTR)   │
+                │ ③ 8-part outline             │
+                │ ④ Long-form script (chunked) │
+                │ ⑤ Humanize rewrite           │
+                └──────────────────────────────┘
+```
 
 ---
 
@@ -161,18 +182,19 @@ tube-atlas-oss/
 │   ├── autocomplete.py   # YouTube keyword suggestions
 │   ├── comments.py       # Comment downloader (no API key)
 │   ├── i18n.py           # EN/KO/JA/VI strings + language selector
-│   ├── llm.py            # DeepSeek integration
+│   ├── keywords.py       # KGR-style score + question buckets
+│   ├── lang_detect.py    # Detect transcript language → LangCode
+│   ├── llm.py            # DeepSeek integration + Studio pipeline helpers
 │   ├── theme.py          # Shared CSS + page_header helper
 │   ├── transcript.py     # YouTube transcript (no API key)
 │   ├── trends.py         # pytrends YouTube
 │   ├── utils.py          # Helpers
-│   └── youtube.py        # YouTube Data API v3 wrapper
+│   └── youtube.py        # YouTube Data API v3 + outliers + opportunity score
 ├── pages/
-│   ├── 01_Niche_Finder.py
-│   ├── 02_Keyword_Finder.py
-│   ├── 03_Video_Cloner.py
-│   ├── 04_Script_Writer.py
-│   └── 05_Title_Studio.py
+│   ├── 01_Niche_Finder.py    # opportunity score + breakouts + AI verdict
+│   ├── 02_Keyword_Finder.py  # KGR score + question buckets + Send-to-Studio
+│   ├── 03_Video_Cloner.py    # auto-language detect + clone kit
+│   └── 04_Studio.py          # 5-step wizard (Topic→Title→Outline→Script→Rewrite)
 ├── tests/                # pytest unit tests
 ├── assets/
 └── requirements.txt

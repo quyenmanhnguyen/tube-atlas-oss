@@ -1,7 +1,14 @@
-"""Niche Finder — trends + top channels + audience pulse + AI verdict.
+"""Niche Finder — trends + top channels + outliers + audience pulse + AI verdict.
 
-Combines logic from the old Trends / Channel / Comment Analyzer pages into a
-single research workflow answering: *"Is this niche worth my time?"*.
+Modernised research workflow answering: *"Is this niche worth my time?"*.
+- Trend signal (Google Trends interest-over-time + related queries)
+- Long-tail keywords (YouTube Autocomplete)
+- Top channels in niche (YouTube search → channels.list)
+- **Outlier detection** (videos whose views >> niche median = "breakouts")
+- **Opportunity score** (recent uploads × top-video reach ÷ saturation)
+- Audience pulse (VADER sentiment on the top video's comments)
+- AI verdict (DeepSeek JSON: hot/warm/cold + opportunities + risks + gaps)
+- "→ Send to Studio" handoff to the 5-step Studio wizard
 """
 from __future__ import annotations
 
@@ -26,10 +33,18 @@ page_header(
     subtitle=t("niche_desc"),
 )
 
+
+def _missing_key_render(exc: Exception) -> bool:
+    if isinstance(exc, RuntimeError) and llm.ERR_NO_DEEPSEEK_KEY in str(exc):
+        st.error(t("err_missing_deepseek"))
+        return True
+    return False
+
+
 with st.form("niche"):
     seed = st.text_input(
         "Niche / seed keyword",
-        placeholder="e.g. minimalist productivity, k-pop reaction, japanese street food",
+        placeholder="e.g. minimalist productivity, k-pop reaction, 불교 말년운",
     )
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -102,17 +117,88 @@ if suggestions:
 else:
     st.caption("No suggestions returned.")
 
-# ─── 3. Top channels in niche ─────────────────────────────────────────────────
-st.subheader("🎬  Top channels in niche")
+# ─── 3. Niche metrics: opportunity + competition + recent uploads ──────────────
 top_videos: list[dict] = []
 top_video: dict | None = None
 channel_rows: list[dict] = []
+total_competition = 0
+recent_uploads = 0
+top_video_views = 0
+
 try:
-    top_videos = yt.search_videos(seed, max_results=25, region=region, order="viewCount")
+    raw_search = yt.search_raw(seed, max_results=25, region=region, order="viewCount")
+    top_videos = raw_search.get("items", [])
+    total_competition = int(raw_search.get("pageInfo", {}).get("totalResults", 0))
 except Exception as e:
     st.warning(f"YouTube search failed (need YOUTUBE_API_KEY?): {e}")
 
+try:
+    recent_uploads = yt.recent_uploads_count(seed, region=region, days=14)
+except Exception:
+    recent_uploads = 0
+
 if top_videos:
+    # Hydrate stats for the top videos (we got snippets only from search).
+    try:
+        ids = [v["id"]["videoId"] for v in top_videos if v.get("id", {}).get("videoId")]
+        hydrated = yt.videos_details(ids[:25])
+    except Exception:
+        hydrated = []
+
+    if hydrated:
+        try:
+            top_video_views = int(hydrated[0].get("statistics", {}).get("viewCount", 0))
+        except (TypeError, ValueError):
+            top_video_views = 0
+
+    # Niche-level metrics
+    score, grade = yt.opportunity_score(
+        recent_uploads=recent_uploads,
+        top_video_views=top_video_views,
+        total_competition=total_competition,
+    )
+    color = {"high": "#22c55e", "medium": "#f59e0b", "low": "#ef4444"}[grade]
+
+    st.subheader("📊  Niche metrics")
+    m1, m2, m3 = st.columns(3)
+    m1.markdown(
+        f"""
+        <div style="padding:14px 18px; border-radius:14px;
+                    background:{color}1a; border:1px solid {color}55;">
+          <div style="color:#a78bfa; font-size:0.75rem; letter-spacing:.18em;">{t("niche_opportunity").upper()}</div>
+          <div style="color:{color}; font-size:1.8rem; font-weight:700;">{score}/100</div>
+          <div style="color:#f5f3ff; opacity:.7; font-size:0.8rem;">{grade}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    m2.metric(t("niche_recent_uploads"), f"{recent_uploads:,}")
+    m3.metric(t("niche_competition"), humanize_int(total_competition))
+
+    # Outlier (breakout) detection
+    breakouts = yt.detect_outliers(hydrated, multiplier=2.5) if hydrated else []
+    st.markdown("**🚀  " + t("niche_breakouts") + "**")
+    if breakouts:
+        rows = []
+        for v in breakouts[:8]:
+            sn = v["snippet"]
+            stats = v.get("statistics", {})
+            rows.append({
+                "title": sn["title"][:80],
+                "channel": sn["channelTitle"],
+                "views": humanize_int(int(stats.get("viewCount", 0))),
+                "× median": f"{v['_view_ratio']:.1f}×",
+                "url": f"https://youtube.com/watch?v={v['id']}",
+            })
+        bdf = pd.DataFrame(rows)
+        st.dataframe(
+            bdf, hide_index=True, use_container_width=True,
+            column_config={"url": st.column_config.LinkColumn("URL")},
+        )
+    else:
+        st.caption(t("niche_no_breakouts"))
+
+    # Top channels (sorted by subs)
     channel_ids = list({v["snippet"]["channelId"] for v in top_videos})[:20]
     try:
         channels = yt.channel_details(channel_ids)
@@ -129,7 +215,9 @@ if top_videos:
             "videos": int(stats.get("videoCount", 0)),
             "url": f"https://youtube.com/channel/{ch['id']}",
         })
+
     if channel_rows:
+        st.markdown("**🎬  Top channels**")
         ch_df = pd.DataFrame(channel_rows).sort_values("subs", ascending=False).head(10)
         ch_df["subs_h"] = ch_df["subs"].apply(humanize_int)
         ch_df["views_h"] = ch_df["views"].apply(humanize_int)
@@ -141,8 +229,8 @@ if top_videos:
             use_container_width=True,
             column_config={"url": st.column_config.LinkColumn("URL")},
         )
-    # Pick top viewed video for audience pulse below.
-    top_video = top_videos[0]
+
+    top_video = top_videos[0] if top_videos else None
 
 # ─── 4. Audience pulse (sentiment on top video) ───────────────────────────────
 sentiment_breakdown: dict[str, int] = {}
@@ -209,6 +297,8 @@ try:
         "channels_top10": channel_rows[:10] if channel_rows else [],
         "audience_sentiment_breakdown": sentiment_breakdown,
         "audience_sample_comments": sample_quotes[:5],
+        "recent_uploads_14d": recent_uploads,
+        "total_competition": total_competition,
     }
     with st.spinner("DeepSeek analysing…"):
         raw = llm.chat_json(json.dumps(payload, default=str), system=sys)
@@ -244,5 +334,12 @@ try:
         st.markdown("**🎯 Content gaps**")
         for x in data.get("content_gaps", []):
             st.markdown(f"- {x}")
+
+    st.markdown("---")
+    if st.button(f"🎬  {t('use_this_keyword')} ({seed})", type="primary", key="send_seed_to_studio"):
+        st.session_state["studio_seed_in"] = seed
+        st.success(t("send_to_studio_hint"))
+        st.page_link("pages/04_Studio.py", label=f"→ {t('studio_name')}", icon="🎬")
 except Exception as e:
-    st.error(f"AI verdict failed: {e}")
+    if not _missing_key_render(e):
+        st.error(f"AI verdict failed: {e}")
