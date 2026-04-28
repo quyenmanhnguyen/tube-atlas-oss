@@ -32,7 +32,11 @@ page_header(
 
 def _send_to_studio(seed: str) -> None:
     st.session_state["studio_seed_in"] = seed
-    st.toast(t("send_to_studio_hint"), icon="🎬")
+    st.session_state["_goto_studio"] = True
+
+
+if st.session_state.pop("_goto_studio", False):
+    st.switch_page("pages/04_Studio.py")
 
 
 with st.form("kw"):
@@ -125,8 +129,13 @@ for _, row in top.iterrows():
             if compute_kgr and row.get("competition"):
                 st.metric(t("kw_competition"), f"{row['competition']:,}")
         with cC:
-            if st.button(t("send_to_studio"), key=f"sts_{row['keyword']}", use_container_width=True):
-                _send_to_studio(row["keyword"])
+            st.button(
+                t("send_to_studio"),
+                key=f"sts_{row['keyword']}",
+                use_container_width=True,
+                on_click=_send_to_studio,
+                args=(row["keyword"],),
+            )
 
 # Full table
 with st.expander(f"📋 All {len(df)} suggestions (table)", expanded=False):

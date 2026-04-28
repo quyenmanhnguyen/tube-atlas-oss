@@ -33,6 +33,17 @@ page_header(
     subtitle=t("niche_desc"),
 )
 
+# If a previous click queued a hand-off to Studio, switch immediately. This
+# runs *before* the form-submit gate, so the redirect survives Streamlit's
+# rerun-after-button-click cycle.
+if st.session_state.pop("_goto_studio", False):
+    st.switch_page("pages/04_Studio.py")
+
+
+def _send_seed_to_studio(value: str) -> None:
+    st.session_state["studio_seed_in"] = value
+    st.session_state["_goto_studio"] = True
+
 
 def _missing_key_render(exc: Exception) -> bool:
     if isinstance(exc, RuntimeError) and llm.ERR_NO_DEEPSEEK_KEY in str(exc):
@@ -336,10 +347,13 @@ try:
             st.markdown(f"- {x}")
 
     st.markdown("---")
-    if st.button(f"🎬  {t('use_this_keyword')} ({seed})", type="primary", key="send_seed_to_studio"):
-        st.session_state["studio_seed_in"] = seed
-        st.success(t("send_to_studio_hint"))
-        st.page_link("pages/04_Studio.py", label=f"→ {t('studio_name')}", icon="🎬")
+    st.button(
+        f"🎬  {t('use_this_keyword')} ({seed})",
+        type="primary",
+        key="send_seed_to_studio",
+        on_click=_send_seed_to_studio,
+        args=(seed,),
+    )
 except Exception as e:
     if not _missing_key_render(e):
         st.error(f"AI verdict failed: {e}")

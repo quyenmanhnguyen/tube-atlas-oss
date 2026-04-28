@@ -29,6 +29,19 @@ page_header(
     subtitle=t("cloner_desc"),
 )
 
+if st.session_state.pop("_goto_studio", False):
+    st.switch_page("pages/04_Studio.py")
+
+
+def _send_title_to_studio(value: str) -> None:
+    st.session_state["studio_title_in"] = value
+    st.session_state["_goto_studio"] = True
+
+
+def _send_topic_to_studio(value: str) -> None:
+    st.session_state["studio_topic_in"] = value
+    st.session_state["_goto_studio"] = True
+
 
 def _missing_key_render(exc: Exception) -> bool:
     if isinstance(exc, RuntimeError) and llm.ERR_NO_DEEPSEEK_KEY in str(exc):
@@ -180,9 +193,13 @@ for i, ttl in enumerate(titles, 1):
             st.markdown(f"**{i:02d}.** {ttl}")
             st.caption(f"📏 {len(ttl)} chars")
         with cB:
-            if st.button(t("send_to_studio"), key=f"clone_sts_{i}", use_container_width=True):
-                st.session_state["studio_title_in"] = ttl
-                st.toast(t("send_to_studio_hint"), icon="🎬")
+            st.button(
+                t("send_to_studio"),
+                key=f"clone_sts_{i}",
+                use_container_width=True,
+                on_click=_send_title_to_studio,
+                args=(ttl,),
+            )
 
 # Script
 st.subheader("📝  Cloned script")
@@ -207,7 +224,10 @@ if tags_out:
 # Pipeline handoff at the bottom: send the *new topic* (or original title) to Studio.
 st.markdown("---")
 handoff_seed = new_topic.strip() or sn["title"]
-if st.button(f"🎬  {t('use_this_topic')} — {handoff_seed[:60]}", type="primary", key="clone_handoff_topic"):
-    st.session_state["studio_topic_in"] = handoff_seed
-    st.success(t("send_to_studio_hint"))
-    st.page_link("pages/04_Studio.py", label=f"→ {t('studio_name')}", icon="🎬")
+st.button(
+    f"🎬  {t('use_this_topic')} — {handoff_seed[:60]}",
+    type="primary",
+    key="clone_handoff_topic",
+    on_click=_send_topic_to_studio,
+    args=(handoff_seed,),
+)
