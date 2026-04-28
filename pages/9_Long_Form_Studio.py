@@ -48,7 +48,7 @@ with st.container(border=True):
             "🌐 Language",
             list(longform.LANGS.keys()),
             format_func=lambda k: longform.LANGS[k]["label"],
-            index=1,  # Vietnamese default
+            index=3,  # Vietnamese default (en=0, ja=1, kr=2, vi=3, th=4)
         )
     with c3:
         extra = st.text_area(

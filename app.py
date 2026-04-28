@@ -129,7 +129,7 @@ st.markdown("""
     <span style="font-size:3rem;">📺</span>
     <h1 style="margin:0; font-size:2.5rem;">Tube Atlas OSS</h1>
     <p style="color:#94a3b8; font-size:1.1rem; margin-top:4px;">
-        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 8 tools + CLI · Streamlit + DeepSeek + YouTube API
+        Bộ công cụ nghiên cứu YouTube mã nguồn mở · 9 tools + CLI · Streamlit + DeepSeek + YouTube API
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -211,7 +211,7 @@ for i, (icon, name, desc, api, feature_available) in enumerate(features):
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center; color:#64748b; font-size:0.8rem; padding:10px;">
-    📺 Tube Atlas OSS v2.2 · 8 tools + CLI + Claude Skill · MIT License ·
+    📺 Tube Atlas OSS v2.2 · 9 tools + CLI + Claude Skill · MIT License ·
     <a href="https://github.com" style="color:#7c3aed; text-decoration:none;">GitHub</a>
     · Built with Streamlit + DeepSeek + YouTube Data API
 </div>
