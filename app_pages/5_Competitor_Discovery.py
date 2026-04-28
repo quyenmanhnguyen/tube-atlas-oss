@@ -9,7 +9,7 @@ import streamlit as st
 from core import competitors, youtube
 from core.utils import humanize_int
 
-st.set_page_config(page_title="Competitor Discovery · Tube Atlas", page_icon="🕵️", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 st.title("🕵️ Competitor Discovery")
 st.caption(
     "Nhập 1 kênh seed → auto extract keywords top → tìm 5 kênh đối thủ "

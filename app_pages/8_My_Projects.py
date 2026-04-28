@@ -7,7 +7,7 @@ import streamlit as st
 
 from core import projects
 
-st.set_page_config(page_title="My Projects", page_icon="📌", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 from core.theme import inject  # noqa: E402
 
 inject()

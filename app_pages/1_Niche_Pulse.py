@@ -11,7 +11,7 @@ import streamlit as st
 from core import research
 from core.utils import humanize_int
 
-st.set_page_config(page_title="Niche Pulse · Tube Atlas", page_icon="🔥", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 st.title("🔥 Niche Pulse")
 st.caption(
     "Quét song song YouTube · Google Trends · Autocomplete · Top comments "

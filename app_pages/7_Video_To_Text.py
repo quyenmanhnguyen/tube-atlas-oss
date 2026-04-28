@@ -5,7 +5,7 @@ import streamlit as st
 
 from core import transcript, youtube as yt
 
-st.set_page_config(page_title="Video → Text", page_icon="📝", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 from core.theme import inject; inject()
 st.title("📝 Video → Text Converter")
 st.caption("Lấy transcript / phụ đề YouTube (kể cả auto-caption).")
