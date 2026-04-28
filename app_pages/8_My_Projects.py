@@ -68,18 +68,17 @@ for tab, k in zip(tabs, kinds):
                     if k == "channel":
                         handle = item["value"].lstrip("@")
                         st.markdown(
-                            "👉 [🩺 Channel Insights](/Channel_Insights)  ·  "
-                            "[🔍 Research Hub](/Research_Hub)  ·  "
+                            "👉 [🔍 Research Hub](/research_hub)  ·  "
                             f"[▶️ YouTube](https://youtube.com/@{handle})"
                         )
                     elif k == "niche":
                         st.markdown(
-                            "👉 [🔍 Research Hub](/Research_Hub)  "
+                            "👉 [🔍 Research Hub](/research_hub)  "
                             "rồi paste topic vào tab Niche Pulse."
                         )
                     else:
                         st.markdown(
-                            "👉 [🎬 Video Lab](/Video_Lab)  "
+                            "👉 [🎬 Video Lab](/video_lab)  "
                             "(stats · SEO · sentiment · remix · transcript)"
                         )
                 with col3:
