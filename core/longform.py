@@ -138,9 +138,10 @@ NICHE_PRESETS: dict[str, dict[str, Any]] = {
 
 
 LANGS = {
+    "en": {"label": "English", "name": "English"},
+    "ja": {"label": "日本語 (Japanese)", "name": "Japanese"},
     "kr": {"label": "한국어 (Korean)", "name": "Korean"},
     "vi": {"label": "Tiếng Việt", "name": "Vietnamese"},
-    "en": {"label": "English", "name": "English"},
     "th": {"label": "ภาษาไทย (Thai)", "name": "Thai"},
 }
 
