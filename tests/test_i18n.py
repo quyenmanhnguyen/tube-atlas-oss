@@ -36,3 +36,22 @@ def test_t_unknown_key_returns_key_itself(monkeypatch):
 
     monkeypatch.setattr(st, "session_state", {})
     assert i18n.t("__nonexistent_key__") == "__nonexistent_key__"
+
+
+def test_outlier_finder_strings_present():
+    for key in [
+        "outlier_name", "outlier_desc", "outlier_run", "outlier_no_results",
+        "outlier_clone_video", "outlier_use_topic", "outlier_score",
+        "outlier_window_7", "outlier_window_14", "outlier_window_30",
+    ]:
+        assert key in i18n.STRINGS, f"missing key {key}"
+        assert "ko" in i18n.STRINGS[key]
+
+
+def test_pulse_and_kw_score_strings_present():
+    for key in [
+        "pulse_title", "pulse_hot", "pulse_cooling", "pulse_stable", "pulse_growth",
+        "kw_score_panel", "kw_volume", "kw_competition_g", "kw_score_proxy_note",
+        "kw_vph_top",
+    ]:
+        assert key in i18n.STRINGS, f"missing key {key}"

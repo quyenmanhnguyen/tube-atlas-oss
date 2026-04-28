@@ -30,7 +30,10 @@ page_header(
 )
 
 if st.session_state.pop("_goto_studio", False):
-    st.switch_page("pages/04_Studio.py")
+    st.switch_page("pages/05_Studio.py")
+
+# Outlier Finder hands off the video URL via cloner_url_in.
+_url_prefill = st.session_state.pop("cloner_url_in", "")
 
 
 def _send_title_to_studio(value: str) -> None:
@@ -51,7 +54,11 @@ def _missing_key_render(exc: Exception) -> bool:
 
 
 with st.form("clone"):
-    url = st.text_input("YouTube video URL", placeholder="https://www.youtube.com/watch?v=…")
+    url = st.text_input(
+        "YouTube video URL",
+        value=_url_prefill,
+        placeholder="https://www.youtube.com/watch?v=…",
+    )
     new_topic = st.text_input(
         "New topic for the clone (optional)",
         placeholder="leave empty to keep the same topic, or e.g. 'protein for cyclists'",

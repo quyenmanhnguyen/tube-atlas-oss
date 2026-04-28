@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-4%20focused%20features-7c3aed?style=for-the-badge" alt="4 focused features">
+<img src="https://img.shields.io/badge/Tools-5%20focused%20features-7c3aed?style=for-the-badge" alt="5 focused features">
 
 </div>
 
@@ -36,38 +36,39 @@
 
 ## ✨ Features
 
-Four focused tools, wired together as a **single seamless pipeline**: discover a niche or keyword → drop it into Studio → walk it through Topic → Title → Outline → Script → Humanize Rewrite. No copy-pasting between tools.
+Five focused tools, wired together as a **single seamless pipeline**: discover a niche, mine keywords, hunt outlier videos, clone winners → drop any of it into Studio → walk it through Topic → Title → Outline → Script → Humanize Rewrite. No copy-pasting between tools.
 
 ### Research
 
 | # | Tool | What it does | API keys |
 |---|---|---|---|
-| 01 | **Niche Finder** | Trends + long-tail keywords + top channels + **outlier (breakout) detection** + **opportunity score** + audience sentiment + AI verdict on whether the niche is hot/warm/cold. | YouTube + DeepSeek |
-| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete + **KGR-style ease-to-rank score** (optional, hits YouTube quota) + **question buckets** (`how/what/why/when/where`). | None / YouTube |
-| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, N title clones, full script clone, thumbnail copy & SEO tags — **auto-detects the source video's language** and emits the kit in the same language. | YouTube + DeepSeek |
+| 01 | **Niche Finder** | Trends + long-tail + top channels + **outlier (breakout) detection** + **opportunity score** + **Trend Pulse 7d** (HOT / cooling / stable) + audience sentiment + AI verdict. | YouTube + DeepSeek |
+| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete + **VidIQ-style Keyword Score** (Volume + Competition gauges, proxy) + **VPH bar chart** of top results + **KGR ease-to-rank** + **question buckets** (`how/what/why/when/where`). | None / YouTube |
+| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, N title clones, full script clone, thumbnail copy & SEO tags — **auto-detects the source video's language**. Transcript backend uses ``youtube-transcript-api`` with **yt-dlp fallback** for cloud-IP environments. | YouTube + DeepSeek |
+| 04 | **Outlier Finder** ⭐ | Find **small channels with viral videos** in the last 7/14/30 days. Filters by ``subs ≤ N`` and ``views/subs ≥ K×``. Per-row **🎯 Clone** + **📝 Studio topic** handoff. CSV export. | YouTube |
 
 ### Create
 
 | # | Tool | What it does | API keys |
 |---|---|---|---|
-| 04 | **Studio** | 5-step wizard: ① 20 topic ideas → ② 10 titles (top 3 CTR marked) → ③ 8-part long-form outline (Hook · Empathy · Problem 1 · Small Change · Story · Problems 2&3 · Reflection · CTA) → ④ full long-form script (chunked, up to 24,000 chars) → ⑤ humanize rewrite. State persists across steps; Niche / Keyword / Cloner can prefill any step via **"→ Send to Studio"**. | DeepSeek |
+| 05 | **Studio** | 5-step wizard: ① 20 topic ideas → ② 10 titles (top 3 CTR marked) → ③ 8-part long-form outline (Hook · Empathy · Problem 1 · Small Change · Story · Problems 2&3 · Reflection · CTA) → ④ full long-form script (chunked, up to 24,000 chars) → ⑤ humanize rewrite. State persists across steps; Niche / Keyword / Cloner / Outlier all prefill any step via **"→ Send to Studio"**. | DeepSeek |
 
 UI and AI output respect the language picker (English / 한국어 / 日本語 / Tiếng Việt) in the sidebar — and Video Cloner overrides it with the source video's detected language unless you force otherwise.
 
 ### Pipeline diagram
 
 ```
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│ 01 Niche Finder │   │ 02 Keyword Find │   │ 03 Video Cloner │
-│ • opportunity   │   │ • KGR score     │   │ • lang detect   │
-│ • breakouts     │   │ • question buck │   │ • title clones  │
-└────────┬────────┘   └────────┬────────┘   └────────┬────────┘
-         │                     │                     │
-         └──── → Send to Studio (prefills seed/topic/title) ────┘
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ 01 Niche    │  │ 02 Keyword  │  │ 03 Cloner   │  │ 04 Outlier  │
+│ • Pulse 7d  │  │ • Vol/Comp  │  │ • lang det  │  │ • subs≤100k │
+│ • outliers  │  │ • VPH chart │  │ • clone kit │  │ • views/sub │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │                │
+       └─── → Send to Studio  ·  → Clone via Cloner  ─────┘
                               │
                               ▼
                 ┌──────────────────────────────┐
-                │      04 Studio (5 steps)     │
+                │     05 Studio (5 steps)      │
                 │ ① Topic ideas (×20)          │
                 │ ② Titles (×10 + top-3 CTR)   │
                 │ ③ 8-part outline             │

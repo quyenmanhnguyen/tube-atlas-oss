@@ -62,7 +62,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-r1, r2, r3 = st.columns(3, gap="large")
+r1, r2 = st.columns(2, gap="large")
 with r1:
     st.markdown(
         _feature_card("01", "🧬", t("niche_name"), t("niche_sub"), t("niche_desc")),
@@ -75,12 +75,20 @@ with r2:
         unsafe_allow_html=True,
     )
     st.page_link("pages/02_Keyword_Finder.py", label=t("card_open") + " →")
+
+r3, r4 = st.columns(2, gap="large")
 with r3:
     st.markdown(
         _feature_card("03", "▶", t("cloner_name"), t("cloner_sub"), t("cloner_desc")),
         unsafe_allow_html=True,
     )
     st.page_link("pages/03_Video_Cloner.py", label=t("card_open") + " →")
+with r4:
+    st.markdown(
+        _feature_card("04", "🎯", t("outlier_name"), t("outlier_sub"), t("outlier_desc")),
+        unsafe_allow_html=True,
+    )
+    st.page_link("pages/04_Outlier_Finder.py", label=t("card_open") + " →")
 
 # ─── Section · Create ─────────────────────────────────────────────────────────
 st.markdown(
@@ -92,13 +100,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-c1, _s1, _s2 = st.columns([1, 1, 1], gap="large")
+c1, _s1 = st.columns([1, 1], gap="large")
 with c1:
     st.markdown(
-        _feature_card("04", "🎬", t("studio_name"), t("studio_sub"), t("studio_desc")),
+        _feature_card("05", "🎬", t("studio_name"), t("studio_sub"), t("studio_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/04_Studio.py", label=t("card_open") + " →")
+    st.page_link("pages/05_Studio.py", label=t("card_open") + " →")
 
 # ─── API status (compact, footer) ─────────────────────────────────────────────
 st.markdown("&nbsp;")

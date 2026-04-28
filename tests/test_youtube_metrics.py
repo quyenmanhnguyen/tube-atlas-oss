@@ -1,7 +1,7 @@
 """Tests for core.youtube outlier + opportunity_score helpers (no API calls)."""
 from __future__ import annotations
 
-from core.youtube import detect_outliers, opportunity_score
+from core.youtube import detect_outliers, opportunity_score, vph
 
 
 def _fake_video(vid: str, view_count: int) -> dict:
@@ -58,3 +58,19 @@ def test_opportunity_score_clamps_to_0_100() -> None:
         recent_uploads=10**9, top_video_views=10**12, total_competition=10**12
     )
     assert 0 <= score <= 100
+
+
+def test_vph_basic() -> None:
+    # 100k views / 10 hours = 10k VPH
+    assert vph(100_000, 10) == 10_000.0
+
+
+def test_vph_floors_hours_at_one() -> None:
+    # Brand-new video: 0 hours since publish → cap at 1
+    assert vph(50_000, 0) == 50_000.0
+    assert vph(50_000, 0.5) == 50_000.0
+
+
+def test_vph_negative_hours_floor() -> None:
+    # Defensive: negative input → still floored
+    assert vph(1_000, -1) == 1_000.0

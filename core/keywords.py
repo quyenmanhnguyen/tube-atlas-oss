@@ -76,6 +76,66 @@ def grade_color(grade: str) -> str:
     return {"easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}.get(grade, "#a78bfa")
 
 
+def volume_score(autocomplete_breadth: int, total_results: int) -> float:
+    """0-100 demand proxy: more autocomplete hits + more total results = more volume.
+
+    Anchors: 1 hit → ~10, 5 hits → ~50, 10+ hits → ~80, plus a bump from
+    log10(total_results) when total_results > 1k.
+    """
+    import math
+
+    breadth = max(autocomplete_breadth, 0)
+    # 0..80 from breadth (saturating around 12 hits)
+    breadth_pts = min(breadth / 12.0, 1.0) * 80
+    # 0..20 from log10(total_results) where 1M+ caps it
+    if total_results > 1:
+        results_pts = min(math.log10(max(total_results, 10)) / 6.0, 1.0) * 20
+    else:
+        results_pts = 0.0
+    return float(min(100.0, breadth_pts + results_pts))
+
+
+def competition_score(total_results: int, top_avg_views: int = 0) -> float:
+    """0-100 competition pressure (higher = harder).
+
+    Anchors:
+    - <1k results → 5 (very low)
+    - 100k → 30
+    - 1M → 50
+    - 10M → 75
+    - 100M+ → 95
+    Bumps another +5..10 if top videos average over 1M views (saturated niche).
+    """
+    import math
+
+    if total_results <= 0:
+        base = 0.0
+    else:
+        # log10 mapping: 0..8 → 0..100
+        base = min(math.log10(max(total_results, 1)) / 8.0, 1.0) * 100
+    if top_avg_views > 1_000_000:
+        base += min(math.log10(top_avg_views / 1_000_000) * 5.0, 10.0)
+    return float(min(100.0, base))
+
+
+def keyword_score(volume: float, competition: float) -> float:
+    """Composite 0-100 score, VidIQ-style: ``0.7×Volume + 0.3×(100−Competition)``.
+
+    Higher = better keyword (high volume + low competition).
+    """
+    return float(max(0.0, min(100.0, 0.7 * volume + 0.3 * (100.0 - competition))))
+
+
+def score_grade(score: float) -> str:
+    if score >= 70:
+        return "great"
+    if score >= 50:
+        return "good"
+    if score >= 30:
+        return "ok"
+    return "weak"
+
+
 def fetch_competition(yt_search_fn, keyword: str, region: str = "US") -> int:
     """Hit YouTube search.list and pull the (approx.) ``totalResults`` count.
 
