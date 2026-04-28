@@ -5,7 +5,12 @@ import os
 from functools import lru_cache
 from typing import Any
 
+from dotenv import load_dotenv
 from googleapiclient.discovery import build
+
+from . import cache as _cache
+
+load_dotenv()
 
 
 def _client():
@@ -17,52 +22,96 @@ def _client():
     return build("youtube", "v3", developerKey=key, cache_discovery=False)
 
 
-def search_videos(query: str, max_results: int = 25, region: str = "VN", order: str = "relevance") -> list[dict]:
+def search_videos(
+    query: str,
+    max_results: int = 25,
+    region: str = "VN",
+    order: str = "relevance",
+    published_after: str | None = None,
+) -> list[dict]:
+    """Tìm video. published_after dùng ISO 8601 UTC, VD '2024-12-01T00:00:00Z'."""
+    key = _cache.make_key("search", q=query, n=max_results, r=region, o=order, pa=published_after)
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
     yt = _client()
-    resp = yt.search().list(
+    params: dict[str, Any] = dict(
         q=query,
         part="snippet",
         type="video",
         maxResults=min(max_results, 50),
         regionCode=region,
         order=order,
-    ).execute()
-    return resp.get("items", [])
+    )
+    if published_after:
+        params["publishedAfter"] = published_after
+    resp = yt.search().list(**params).execute()
+    items = resp.get("items", [])
+    _cache.set_(key, items, ttl=3 * 3600)
+    return items
 
 
 def videos_details(video_ids: list[str]) -> list[dict]:
+    out: list[dict] = []
+    miss: list[str] = []
+    by_id: dict[str, dict] = {}
+    for vid in video_ids:
+        c = _cache.get(_cache.make_key("video", id=vid))
+        if c is not None:
+            by_id[vid] = c
+        else:
+            miss.append(vid)
+    if miss:
+        yt = _client()
+        for i in range(0, len(miss), 50):
+            chunk = miss[i : i + 50]
+            resp = yt.videos().list(
+                id=",".join(chunk),
+                part="snippet,statistics,contentDetails,topicDetails,status",
+                maxResults=50,
+            ).execute()
+            for item in resp.get("items", []):
+                by_id[item["id"]] = item
+                _cache.set_(_cache.make_key("video", id=item["id"]), item, ttl=6 * 3600)
+    for vid in video_ids:
+        if vid in by_id:
+            out.append(by_id[vid])
+    return out
+
+
+def channel_details(channel_ids: list[str]) -> list[dict]:
+    """Fetch channel details, batching IDs in chunks of 50 (YouTube API limit)."""
+    if not channel_ids:
+        return []
     yt = _client()
     out: list[dict] = []
-    for i in range(0, len(video_ids), 50):
-        chunk = video_ids[i : i + 50]
-        resp = yt.videos().list(
+    for i in range(0, len(channel_ids), 50):
+        chunk = channel_ids[i : i + 50]
+        resp = yt.channels().list(
             id=",".join(chunk),
-            part="snippet,statistics,contentDetails,topicDetails,status",
+            part="snippet,statistics,brandingSettings,topicDetails",
             maxResults=50,
         ).execute()
         out.extend(resp.get("items", []))
     return out
 
 
-def channel_details(channel_ids: list[str]) -> list[dict]:
-    yt = _client()
-    resp = yt.channels().list(
-        id=",".join(channel_ids),
-        part="snippet,statistics,brandingSettings,topicDetails",
-        maxResults=50,
-    ).execute()
-    return resp.get("items", [])
-
-
 def channel_by_handle(handle: str) -> dict | None:
-    yt = _client()
     handle = handle.lstrip("@")
+    key = _cache.make_key("channel_handle", h=handle)
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
+    yt = _client()
     resp = yt.channels().list(
         forHandle=handle,
         part="snippet,statistics,brandingSettings,topicDetails",
     ).execute()
     items = resp.get("items", [])
-    return items[0] if items else None
+    val = items[0] if items else None
+    if val is not None:
+        _cache.set_(key, val, ttl=6 * 3600)
+    return val
 
 
 def channel_uploads_playlist(channel_id: str) -> str | None:
