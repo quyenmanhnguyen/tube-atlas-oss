@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-10%20features-7c3aed?style=for-the-badge" alt="10 features">
+<img src="https://img.shields.io/badge/Tools-7%20features%20%2B%20CLI-7c3aed?style=for-the-badge" alt="7 features + CLI">
 
 </div>
 
@@ -34,22 +34,52 @@
 
 ---
 
-## ✨ Tính năng
+## ✨ Tính năng (v2.0 — slim & focused)
+
+Từ 13 tools của v1.2, v2.0 đã **consolidate xuống 7 tools** bằng cách xóa cái trùng (Browser Extractor, Shorts Analyzer, Content Spinner, Keyword/Trends page-level) và gộp cái cùng chung flow (Comment Analyzer → tab trong Video Analyzer, Content Spinner → mode trong Title Studio).
 
 | # | Tool | Mô tả | Cần API key? |
 |---|---|---|---|
-| 🔑 | **Keyword Generator** | Long-tail keywords từ YouTube Autocomplete | ❌ Free |
-| 📈 | **Trends Generator** | Google Trends cho YouTube + related queries | ❌ Free |
-| 🎬 | **Video Analyzer** | Stats, engagement, tags chi tiết | ✅ YouTube |
-| 📊 | **Channel Analyzer** | KPI kênh, upload frequency, top videos | ✅ YouTube |
-| ✨ | **Title Generator** | Gợi ý title CTR cao bằng AI | ✅ DeepSeek |
-| 📝 | **Video → Text** | Transcript / phụ đề từ YouTube | ❌ Free |
-| 🌀 | **Content Spinner** | Spin / rewrite nội dung bằng AI | ✅ DeepSeek |
-| 🕸️ | **Browser Extractor** | Search + scrape data bulk | ✅ YouTube |
-| 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
-| 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
+| 🔥 | **Niche Pulse** | Briefing N ngày (YT + Trends + Autocomplete + AI) · filter Shorts · export markdown | ✅ YouTube |
+| 🩺 | **Channel Audit** | Chấm điểm kênh 0-100 · **so sánh 2 kênh side-by-side** · export markdown | ✅ YouTube |
+| 📊 | **Channel Analyzer** | KPI kênh · outlier score · best time to post · cross-nav sang Audit | ✅ YouTube |
+| 🎬 | **Video Analyzer** | Stats + **SEO score 0-100** + **sentiment comments** (3 tab) | ✅ YouTube |
+| 🕵️ | **Competitor Discovery** | Auto tìm top N đối thủ cùng niche · keyword extraction có bigrams + recency bias | ✅ YouTube |
+| ✨ | **Title & Script Studio** | Sinh title · **rewrite/spin** · brainstorm ý tưởng (3 mode) | ✅ DeepSeek |
+| 📝 | **Video → Text** | Transcript / phụ đề (+ yt-dlp fallback) | ❌ Free |
+| 📌 | **My Projects** | Bookmark kênh / niche / video (local SQLite) | ❌ Free |
 
-> **6/10 tools hoạt động ngay** mà không cần API key nào!
+> **2/7 tools hoạt động ngay** (Video→Text + My Projects) không cần API key.
+
+### ✨ v2.0 highlights
+
+- **Video SEO Score 0-100** — chấm điểm 1 video trên 6 tiêu chí (title length, description, tags, thumbnail HD, engagement, keyword coverage) với grade A+/A/B/C/D/F + recommendations cụ thể.
+- **Channel Audit so sánh 2 kênh** — radar chart overlay, bảng điểm cạnh nhau, export markdown cả 2.
+- **Niche Pulse Shorts filter** — checkbox "Chỉ Shorts (≤60s)" + export briefing Markdown 1 click.
+- **Title & Script Studio 3 mode** — Generate title / Rewrite-Spin nội dung / Brainstorm ý tưởng trong 1 page duy nhất.
+- **Competitor Discovery cải tiến** — bigrams + recency bias + expanded stop-words (EN+VN) + loại token của tên kênh seed.
+- **My Projects** — bookmark kênh / niche / video yêu thích, mở nhanh lần sau.
+- **CLI `--json` trên mọi command** (doctor, audit, competitors, cache, projects) — trước đây chỉ có `niche` + `competitors`.
+
+### ✨ v1.2 highlights (mượn ý từ `/last30days-skill` + `agent-reach`)
+
+- **🔥 Niche Pulse** (page mới): quét **song song** YouTube (last 30d) + Google Trends + YouTube Autocomplete + top comments → DeepSeek tổng hợp briefing 5 mục (nhiệt độ chủ đề, format viral, keyword emerging, sentiment, 3 ý tưởng video). Cảm hứng từ [`/last30days-skill`](https://github.com/mvanhorn/last30days-skill) (24k⭐).
+- **🕵️ Competitor Discovery** (page mới): nhập 1 kênh seed → auto extract keywords top → song song search → rank top N kênh đối thủ cùng niche.
+- **🖥️ CLI `tube-atlas`** (cảm hứng `agent-reach`):
+  - `tube-atlas doctor` — check env + API probe + cache + deps
+  - `tube-atlas niche "review iphone 17" --days 30` — briefing ra markdown
+  - `tube-atlas audit @MrBeast` — chấm điểm kênh 0-100
+  - `tube-atlas competitors @MrBeast -n 5`
+  - `--json` flag cho mọi command, dễ pipe vào agent
+- **🧩 Claude Skill** (`skills/tube-atlas/SKILL.md`): dùng được trong Claude Code / Cursor / Gemini CLI qua CLI ở trên.
+
+### ✨ v1.1 highlights (VidIQ-parity features)
+
+- **⚡ Outlier Score** trong Channel Analyzer: flag video viral của competitor (`views/median(channel)` ≥5x = 🔥 viral, 2-5x = 📈 trên TB)
+- **⏰ Best Time to Post**: phân tích top videos → gợi ý ngày + giờ post tốt nhất (giờ VN UTC+7)
+- **🩺 Channel Audit**: chấm điểm kênh 0-100 trên 5 tiêu chí (upload frequency, engagement, tags coverage, title length, thumbnail HD) + recommendations cụ thể
+- **💾 SQLite cache** cho YouTube API → tiết kiệm 5-10x quota khi mở lại cùng kênh / search
+- **📝 Video→Text fallback**: tự động chuyển sang `yt-dlp` nếu `youtube-transcript-api` bị chặn IP (cloud env)
 
 ---
 
@@ -67,11 +97,35 @@ pip install -r requirements.txt
 cp .env.example .env
 # Sửa .env → thêm YOUTUBE_API_KEY và DEEPSEEK_API_KEY
 
-# Chạy
+# Chạy dashboard
 streamlit run app.py
+
+# Hoặc dùng CLI
+pip install -e .
+tube-atlas doctor
+tube-atlas niche "review iphone 17" --days 30
+tube-atlas audit @MrBeast
 ```
 
 Mở browser tại **http://localhost:8501** 🎉
+
+---
+
+## 🖥️ CLI
+
+Sau `pip install -e .` bạn có lệnh `tube-atlas` trong PATH:
+
+```bash
+tube-atlas doctor                              # health check env + API
+tube-atlas niche "AI agent" --days 30          # briefing 30 ngày
+tube-atlas niche "crypto" --json --no-llm      # raw JSON cho agent
+tube-atlas audit @MrBeast --limit 100          # chấm kênh 0-100
+tube-atlas competitors @MrBeast -n 5 --json    # top 5 đối thủ
+tube-atlas cache stats                         # SQLite cache stats
+```
+
+Dùng được trong **Claude Code / Cursor / Gemini CLI** thông qua
+[`skills/tube-atlas/SKILL.md`](skills/tube-atlas/SKILL.md).
 
 ---
 

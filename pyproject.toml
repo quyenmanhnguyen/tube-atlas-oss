@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tube-atlas-oss"
+version = "1.2.0"
+description = "Bộ công cụ nghiên cứu YouTube mã nguồn mở — 13 tools + CLI + Claude Skill"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "quyenmanhnguyen" }]
+dependencies = [
+    "streamlit>=1.36",
+    "google-api-python-client>=2.120",
+    "youtube-transcript-api>=1.0",
+    "youtube-comment-downloader>=0.1.76",
+    "pytrends>=4.9.2",
+    "yt-dlp>=2024.8.6",
+    "requests>=2.32",
+    "pandas>=2.2",
+    "plotly>=5.22",
+    "python-dotenv>=1.0",
+    "openai>=1.40",
+    "vaderSentiment>=3.3.2",
+    "wordcloud>=1.9",
+    "matplotlib>=3.9",
+]
+
+[project.scripts]
+tube-atlas = "tube_atlas_cli:main"
+
+[tool.setuptools]
+py-modules = ["tube_atlas_cli"]
+packages = ["core"]
+
+[project.urls]
+Homepage = "https://github.com/quyenmanhnguyen/tube-atlas-oss"
+Issues = "https://github.com/quyenmanhnguyen/tube-atlas-oss/issues"

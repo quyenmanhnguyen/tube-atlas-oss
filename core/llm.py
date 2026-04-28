@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import os
+from dotenv import load_dotenv
 from openai import OpenAI
+
+load_dotenv()
 
 
 def client() -> OpenAI:
