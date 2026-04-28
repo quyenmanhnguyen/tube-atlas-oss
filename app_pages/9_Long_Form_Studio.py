@@ -11,7 +11,7 @@ import streamlit as st
 
 from core import longform
 
-st.set_page_config(page_title="Long-form Studio", page_icon="📝", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 from core.theme import inject  # noqa: E402
 
 inject()
@@ -48,7 +48,7 @@ with st.container(border=True):
             "🌐 Language",
             list(longform.LANGS.keys()),
             format_func=lambda k: longform.LANGS[k]["label"],
-            index=3,  # Vietnamese default (en=0, ja=1, kr=2, vi=3, th=4)
+            index=0,  # English default (en=0, ja=1, kr=2)
         )
     with c3:
         extra = st.text_area(
@@ -71,13 +71,14 @@ with st.expander(f"📖 Niche profile — {longform.NICHE_PRESETS[niche]['label'
             st.markdown(f"- {ex}")
 
 # ─── Steps ──────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab_ai, tab6 = st.tabs(
     [
         "1️⃣ Topic pool",
         "2️⃣ Title lab",
         "3️⃣ 8-part outline",
         "4️⃣ Full script",
         "5️⃣ Rewrite (khử AI)",
+        "🛡️ AI Check",
         "📚 Stock resources",
     ]
 )
@@ -340,6 +341,76 @@ with tab5:
                 file_name="longform_pipeline.json",
                 mime="application/json",
             )
+
+# ─── AI Check ───────────────────────────────────────────────────────────────
+with tab_ai:
+    st.subheader("🛡️ AI-likeness Check (local heuristic)")
+    st.caption(
+        "Chấm điểm 'mùi AI' của script. Score càng cao càng tự nhiên. "
+        "Score < 60 → nên rerun Bước 5 (rewrite) để giảm tính máy móc."
+    )
+    from core import ai_detector
+
+    default_text = ss.lf_rewritten or ss.lf_script or ""
+    text_to_check = st.text_area(
+        "📜 Văn bản cần check",
+        value=default_text,
+        height=200,
+        help="Mặc định lấy từ Bước 5 (rewrite) hoặc Bước 4 (script). Có thể paste văn bản khác.",
+    )
+
+    if st.button("🛡️ Phân tích", type="primary", key="btn_ai_check"):
+        if len(text_to_check.strip()) < 200:
+            st.warning("Văn bản quá ngắn (<200 ký tự) — kết quả không đáng tin.")
+        else:
+            result = ai_detector.detect(text_to_check, lang)
+            score = result["score"]
+            verdict = result["verdict"]
+
+            color = "#10b981" if score >= 75 else ("#f59e0b" if score >= 55 else "#ef4444")
+            st.markdown(
+                f"""
+<div style="background:linear-gradient(135deg,{color}33,{color}11);
+            border:1px solid {color};border-radius:12px;padding:24px;text-align:center;
+            margin:16px 0;">
+    <div style="font-size:0.9rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">
+        Human-likeness Score
+    </div>
+    <div style="font-size:3.5rem;font-weight:800;color:{color};line-height:1;margin:8px 0;">
+        {score}<span style="font-size:1.5rem;color:#64748b;">/100</span>
+    </div>
+    <div style="font-size:1.1rem;color:#e2e8f0;font-weight:600;">{verdict}</div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("**🔬 Chi tiết các thành phần:**")
+            cols = st.columns(5)
+            comp_labels = {
+                "burstiness": "Burstiness",
+                "lexical_diversity": "Lexical diversity",
+                "ngram_repetition": "N-gram repetition",
+                "starter_homogeneity": "Sentence starters",
+                "ai_phrases": "AI tell-phrases",
+            }
+            for i, (k, label) in enumerate(comp_labels.items()):
+                with cols[i]:
+                    v = result["components"][k]
+                    st.metric(label, f"{v}")
+
+            if result["suggestions"]:
+                st.markdown("**💡 Gợi ý cải thiện:**")
+                for s in result["suggestions"]:
+                    st.markdown(f"- {s}")
+                if score < 75 and ss.lf_script:
+                    st.info(
+                        "👉 Quay lại Bước 5 — Rewrite, thêm Extra instruction "
+                        "tăng burstiness / paraphrase mạnh hơn.",
+                        icon="🔁",
+                    )
+            else:
+                st.success("Script rất tự nhiên. Có thể dùng luôn.")
 
 # ─── Stock resources ────────────────────────────────────────────────────────
 with tab6:

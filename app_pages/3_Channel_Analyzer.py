@@ -9,7 +9,7 @@ from core import youtube as yt
 from core import scoring
 from core.utils import humanize_int, parse_iso_duration
 
-st.set_page_config(page_title="Channel Analyzer", page_icon="📊", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 from core.theme import inject; inject()
 st.title("📊 Channel Analyzer")
 st.caption("Phân tích kênh: KPIs, top videos, tần suất upload.")

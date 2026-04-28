@@ -138,11 +138,9 @@ NICHE_PRESETS: dict[str, dict[str, Any]] = {
 
 
 LANGS = {
-    "en": {"label": "English", "name": "English"},
-    "ja": {"label": "日本語 (Japanese)", "name": "Japanese"},
-    "kr": {"label": "한국어 (Korean)", "name": "Korean"},
-    "vi": {"label": "Tiếng Việt", "name": "Vietnamese"},
-    "th": {"label": "ภาษาไทย (Thai)", "name": "Thai"},
+    "en": {"label": "🇬🇧 English", "name": "English"},
+    "ja": {"label": "🇯🇵 日本語 (Japanese)", "name": "Japanese"},
+    "kr": {"label": "🇰🇷 한국어 (Korean)", "name": "Korean"},
 }
 
 
@@ -173,9 +171,9 @@ _TOPIC_SYS = (
 )
 
 
-def topic_pool(niche: str, lang: str = "kr", n: int = 20, extra: str = "") -> list[dict]:
+def topic_pool(niche: str, lang: str = "en", n: int = 20, extra: str = "") -> list[dict]:
     """Sinh n topic theo niche. Return list[{topic, emotion, hook_point, rationale}]."""
-    lang_name = LANGS.get(lang, LANGS["vi"])["name"]
+    lang_name = LANGS.get(lang, LANGS["en"])["name"]
     niche_block = _niche_block(niche, lang)
     prompt = (
         f"{niche_block}\n"
@@ -213,9 +211,9 @@ _TITLE_SYS = (
 )
 
 
-def title_lab(topic: str, niche: str, lang: str = "kr", n: int = 10, extra: str = "") -> dict:
+def title_lab(topic: str, niche: str, lang: str = "en", n: int = 10, extra: str = "") -> dict:
     """Return {titles:[{title, angle, click_point, ctr_rank}], top_3:[idx,...]}."""
-    lang_name = LANGS.get(lang, LANGS["vi"])["name"]
+    lang_name = LANGS.get(lang, LANGS["en"])["name"]
     niche_block = _niche_block(niche, lang)
     prompt = (
         f"{niche_block}\n"
@@ -265,9 +263,9 @@ _PART_ROLES = [
 ]
 
 
-def outline_8part(title: str, niche: str, lang: str = "kr", extra: str = "") -> list[dict]:
+def outline_8part(title: str, niche: str, lang: str = "en", extra: str = "") -> list[dict]:
     """Return list of 8 parts: [{part, role, core_emotion, expand_direction, est_words}]."""
-    lang_name = LANGS.get(lang, LANGS["vi"])["name"]
+    lang_name = LANGS.get(lang, LANGS["en"])["name"]
     niche_block = _niche_block(niche, lang)
     roles_str = "\n".join(f"{i+1}. {r[0]} — {r[1]}" for i, r in enumerate(_PART_ROLES))
     prompt = (
@@ -313,12 +311,12 @@ def full_script(
     title: str,
     outline: list[dict],
     niche: str,
-    lang: str = "kr",
+    lang: str = "en",
     target_chars: int = 18000,
     extra: str = "",
 ) -> str:
     """Generate full narration script (~target_chars characters, 20-40 min)."""
-    lang_name = LANGS.get(lang, LANGS["vi"])["name"]
+    lang_name = LANGS.get(lang, LANGS["en"])["name"]
     niche_block = _niche_block(niche, lang)
     outline_text = "\n".join(
         f"PART {p.get('part', i + 1)} — {p.get('role', '')}:\n"
@@ -371,9 +369,9 @@ _REWRITE_SYS = (
 )
 
 
-def dehumanize(script: str, niche: str, lang: str = "kr", extra: str = "") -> str:
+def dehumanize(script: str, niche: str, lang: str = "en", extra: str = "") -> str:
     """Rewrite pass to strip AI fingerprint: preserve length, deepen emotion, vary rhythm."""
-    lang_name = LANGS.get(lang, LANGS["vi"])["name"]
+    lang_name = LANGS.get(lang, LANGS["en"])["name"]
     niche_block = _niche_block(niche, lang)
     prompt = (
         f"{niche_block}\n"

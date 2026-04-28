@@ -12,7 +12,7 @@ from core import youtube as yt
 from core.scoring import video_seo_score
 from core.utils import engagement_rate, humanize_int, parse_iso_duration
 
-st.set_page_config(page_title="Video Analyzer", page_icon="🎬", layout="wide")
+# st.set_page_config moved to app.py (st.navigation entrypoint)
 from core.theme import inject  # noqa: E402
 
 inject()
