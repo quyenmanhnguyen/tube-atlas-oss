@@ -43,8 +43,36 @@ def _split_sentences(text: str) -> list[str]:
     return [s.strip() for s in sents if s.strip()]
 
 
+# CJK character ranges (Hiragana, Katakana, CJK Unified Ideographs, Hangul)
+_CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]")
+
+
+def _is_cjk_heavy(text: str) -> bool:
+    """Return True if >30% of non-whitespace chars are CJK — switch tokenizer."""
+    visible = [c for c in text if not c.isspace()]
+    if not visible:
+        return False
+    cjk = sum(1 for c in visible if _CJK_RE.match(c))
+    return (cjk / len(visible)) > 0.3
+
+
 def _tokenize(text: str) -> list[str]:
-    return re.findall(r"\w+", text.lower())
+    """Tokenize for any language.
+
+    For Latin scripts: extract `\\w+` runs (whitespace-delimited words).
+    For CJK-heavy text: each CJK character becomes its own token (no spaces);
+    Latin words and digits inside the same text are still extracted as words
+    so mixed Japanese+English passages work correctly.
+    """
+    text_lower = text.lower()
+    if not _is_cjk_heavy(text_lower):
+        return re.findall(r"\w+", text_lower)
+
+    tokens: list[str] = []
+    # Pull out any non-CJK word runs (Latin/digits) first
+    for match in re.finditer(r"[a-z0-9_]+|[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]", text_lower):
+        tokens.append(match.group(0))
+    return tokens
 
 
 def _ngrams(tokens: list[str], n: int) -> list[tuple]:
