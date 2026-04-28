@@ -37,7 +37,7 @@ page_header(
 # runs *before* the form-submit gate, so the redirect survives Streamlit's
 # rerun-after-button-click cycle.
 if st.session_state.pop("_goto_studio", False):
-    st.switch_page("pages/04_Studio.py")
+    st.switch_page("pages/05_Studio.py")
 
 
 def _send_seed_to_studio(value: str) -> None:
@@ -147,6 +147,34 @@ try:
     recent_uploads = yt.recent_uploads_count(seed, region=region, days=14)
 except Exception:
     recent_uploads = 0
+
+# ─── Trend Pulse 7d (HOT / cooling / stable) ──────────────────────────────────
+try:
+    pulse = yt.trend_pulse(seed, region=region)
+except Exception:
+    pulse = None
+
+if pulse:
+    pulse_color = {"hot": "#ef4444", "cooling": "#3b82f6", "stable": "#a78bfa"}[pulse["status"]]
+    pulse_label = t(f"pulse_{pulse['status']}")
+    st.markdown(
+        f"""
+        <div style="margin: 14px 0; padding:16px 22px; border-radius:14px;
+                    background:{pulse_color}14; border:1px solid {pulse_color}55;
+                    display:flex; gap:24px; align-items:center;">
+            <div style="font-size:1.4rem; font-weight:700; color:{pulse_color};">
+                {pulse_label}
+            </div>
+            <div style="display:flex; gap:32px; opacity:.85;">
+                <div><div style="font-size:.7rem; letter-spacing:.16em; color:#a78bfa;">{t("pulse_title").upper()}</div>
+                     <div style="font-weight:600;">{pulse["recent_7d"]:,} <span style="opacity:.6;">/ {pulse["prior_7d"]:,} prior</span></div></div>
+                <div><div style="font-size:.7rem; letter-spacing:.16em; color:#a78bfa;">{t("pulse_growth").upper()}</div>
+                     <div style="font-weight:600; color:{pulse_color};">{pulse["growth_pct"]:+.0f}%</div></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 if top_videos:
     # Hydrate stats for the top videos (we got snippets only from search).

@@ -36,7 +36,7 @@ def _send_to_studio(seed: str) -> None:
 
 
 if st.session_state.pop("_goto_studio", False):
-    st.switch_page("pages/04_Studio.py")
+    st.switch_page("pages/05_Studio.py")
 
 
 with st.form("kw"):
@@ -73,6 +73,106 @@ if not items:
     st.stop()
 
 rows = keywords.build_rows(seed, items)
+
+
+# ─── Keyword Score panel (VidIQ-style, proxy) ─────────────────────────────────
+def _gauge_html(label: str, value: float, color: str) -> str:
+    pct = max(0, min(100, int(round(value))))
+    return f"""
+    <div style="padding:12px 16px; border-radius:14px;
+                background:linear-gradient(180deg, {color}1a, {color}0d);
+                border:1px solid {color}55;">
+      <div style="color:#a78bfa; font-size:0.7rem; letter-spacing:.18em;">{label.upper()}</div>
+      <div style="color:{color}; font-size:1.7rem; font-weight:700; line-height:1.1;">{pct}<span style="font-size:0.85rem; opacity:.6;">/100</span></div>
+      <div style="margin-top:8px; height:6px; background:#1a1040; border-radius:99px; overflow:hidden;">
+        <div style="width:{pct}%; height:100%; background:{color};"></div>
+      </div>
+    </div>
+    """
+
+
+seed_volume_score: float | None = None
+seed_competition_score: float | None = None
+seed_keyword_score: float | None = None
+seed_total_results: int = 0
+seed_top_videos: list[dict] = []
+
+if os.getenv("YOUTUBE_API_KEY"):
+    try:
+        from core import youtube as yt
+
+        resp = yt.search_raw(seed, max_results=10, region=gl, order="relevance")
+        seed_total_results = int(resp.get("pageInfo", {}).get("totalResults", 0))
+        search_items = resp.get("items", [])
+        ids = [
+            it["id"]["videoId"]
+            for it in search_items
+            if it.get("id", {}).get("videoId")
+        ]
+        if ids:
+            seed_top_videos = yt.videos_details(ids[:10])
+        top_views = [
+            int(v.get("statistics", {}).get("viewCount", 0)) for v in seed_top_videos
+        ]
+        avg_top = int(sum(top_views) / len(top_views)) if top_views else 0
+        seed_volume_score = keywords.volume_score(len(items), seed_total_results)
+        seed_competition_score = keywords.competition_score(seed_total_results, avg_top)
+        seed_keyword_score = keywords.keyword_score(
+            seed_volume_score, seed_competition_score
+        )
+    except Exception:
+        pass
+
+if seed_keyword_score is not None:
+    st.markdown(f"### {t('kw_score_panel')} — `{seed}`")
+    g1, g2, g3 = st.columns(3)
+    score_color = (
+        "#22c55e" if seed_keyword_score >= 70
+        else "#f59e0b" if seed_keyword_score >= 40
+        else "#ef4444"
+    )
+    with g1:
+        st.markdown(
+            _gauge_html(t("kw_score_panel"), seed_keyword_score, score_color),
+            unsafe_allow_html=True,
+        )
+    with g2:
+        st.markdown(
+            _gauge_html(t("kw_volume"), seed_volume_score or 0.0, "#22c55e"),
+            unsafe_allow_html=True,
+        )
+    with g3:
+        st.markdown(
+            _gauge_html(t("kw_competition_g"), seed_competition_score or 0.0, "#ef4444"),
+            unsafe_allow_html=True,
+        )
+    st.caption(t("kw_score_proxy_note"))
+
+    # VPH sparkline of top 10 results
+    if seed_top_videos:
+        from datetime import datetime, timezone
+
+        from core import youtube as yt2
+
+        vph_rows: list[dict] = []
+        for v in seed_top_videos:
+            try:
+                pub = v["snippet"]["publishedAt"].replace("Z", "+00:00")
+                dt = datetime.fromisoformat(pub)
+                hours = max((datetime.now(timezone.utc) - dt).total_seconds() / 3600.0, 1.0)
+                views = int(v.get("statistics", {}).get("viewCount", 0))
+                vph_rows.append({
+                    "title": v["snippet"]["title"][:60],
+                    "vph": yt2.vph(views, hours),
+                    "views": views,
+                })
+            except Exception:
+                continue
+        if vph_rows:
+            vdf = pd.DataFrame(vph_rows).sort_values("vph", ascending=False).reset_index(drop=True)
+            st.markdown(f"**{t('kw_vph_top')}**")
+            st.bar_chart(vdf, x="title", y="vph", height=200)
+    st.markdown("---")
 
 # ─── KGR-style competition + score ────────────────────────────────────────────
 if compute_kgr:

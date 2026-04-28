@@ -63,6 +63,37 @@ def recent_uploads_count(query: str, region: str = "US", days: int = 14) -> int:
     return int(resp.get("pageInfo", {}).get("totalResults", 0))
 
 
+def trend_pulse(query: str, region: str = "US") -> dict:
+    """Compare last-7d uploads to the prior 7d → "HOT / cooling / stable".
+
+    Returns ``{recent_7d, prior_7d, growth_pct, status}``.
+    """
+    recent = recent_uploads_count(query, region=region, days=7)
+    last_14 = recent_uploads_count(query, region=region, days=14)
+    prior = max(last_14 - recent, 0)
+    if prior == 0:
+        growth = 0.0 if recent == 0 else 100.0
+    else:
+        growth = ((recent - prior) / prior) * 100.0
+    if growth >= 30 and recent >= 5:
+        status = "hot"
+    elif growth <= -20:
+        status = "cooling"
+    else:
+        status = "stable"
+    return {
+        "recent_7d": recent,
+        "prior_7d": prior,
+        "growth_pct": growth,
+        "status": status,
+    }
+
+
+def vph(views: int, hours_since_published: float) -> float:
+    """Views per hour. Floors hours at 1 to avoid div-by-zero / nonsense."""
+    return float(views) / max(hours_since_published, 1.0)
+
+
 def channel_recent_videos(channel_id: str, max_videos: int = 30) -> list[dict]:
     """Recent videos from a channel via its uploads playlist + videos.list."""
     pl = channel_uploads_playlist(channel_id)

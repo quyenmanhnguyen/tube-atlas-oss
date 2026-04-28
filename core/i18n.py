@@ -172,6 +172,50 @@ STRINGS: dict[str, dict[LangCode, str]] = {
     "cloner_detected_lang": {"en": "Detected language", "ko": "감지된 언어", "ja": "検出された言語", "vi": "Ngôn ngữ phát hiện"},
     "cloner_override_lang": {"en": "Override output language", "ko": "출력 언어 강제 지정", "ja": "出力言語の上書き", "vi": "Ép ngôn ngữ output"},
     "cloner_lang_auto":     {"en": "auto (use detected)", "ko": "자동 (감지된 값 사용)", "ja": "自動（検出値を使用）", "vi": "tự động (theo phát hiện)"},
+
+    # Outlier Finder
+    "outlier_name":     {"en": "Outlier Finder", "ko": "아웃라이어 파인더", "ja": "アウトライアー・ファインダー", "vi": "Outlier Finder"},
+    "outlier_sub":      {"en": "Small channels, viral videos", "ko": "작은 채널의 바이럴 영상", "ja": "小チャンネルのバイラル動画", "vi": "Kênh nhỏ, video bùng nổ"},
+    "outlier_desc":     {"en": "Find videos blowing up on small channels — clonable templates the algorithm just rewarded.",
+                         "ko": "작은 채널에서 터지고 있는 영상 — 알고리즘이 막 보상한 클론 가능한 템플릿.",
+                         "ja": "小チャンネルで急上昇中の動画 — アルゴリズムが今報酬を与えた、クローン可能なテンプレート。",
+                         "vi": "Tìm video đang bùng nổ trên kênh nhỏ — template có thể bắt chước mà algo vừa thưởng."},
+    "outlier_seed":     {"en": "Niche / seed keyword", "ko": "니치 / 시드 키워드", "ja": "ニッチ / シードキーワード", "vi": "Niche / từ khoá seed"},
+    "outlier_window":   {"en": "Time window", "ko": "기간", "ja": "期間", "vi": "Khoảng thời gian"},
+    "outlier_max_subs": {"en": "Max subscribers", "ko": "최대 구독자수", "ja": "登録者数の上限", "vi": "Subs tối đa"},
+    "outlier_min_ratio": {"en": "Min outlier ratio", "ko": "최소 아웃라이어 비율", "ja": "最小アウトライア比", "vi": "Tỉ lệ outlier tối thiểu"},
+    "outlier_run":      {"en": "Find outliers", "ko": "아웃라이어 찾기", "ja": "アウトライアーを探す", "vi": "Tìm outlier"},
+    "outlier_no_results": {"en": "No outliers in this window. Try a wider window or higher max-subs threshold.",
+                            "ko": "이 기간 동안 아웃라이어가 없습니다. 기간을 늘리거나 구독자수 한도를 올려보세요.",
+                            "ja": "この期間にアウトライアーは見つかりませんでした。期間を広げるか、登録者数の上限を上げてください。",
+                            "vi": "Không có outlier trong khoảng này. Thử mở rộng khoảng thời gian hoặc tăng max subs."},
+    "outlier_clone_video": {"en": "🎯 Clone this video", "ko": "🎯 이 영상 클론", "ja": "🎯 この動画をクローン", "vi": "🎯 Clone video này"},
+    "outlier_use_topic": {"en": "📝 Use as Studio topic", "ko": "📝 스튜디오 주제로 사용", "ja": "📝 スタジオのテーマに使う", "vi": "📝 Dùng làm topic Studio"},
+    "outlier_score":    {"en": "Outlier ×", "ko": "아웃라이어 ×", "ja": "アウトライア ×", "vi": "Outlier ×"},
+    "outlier_max_vph":  {"en": "Max VPH", "ko": "최대 VPH", "ja": "最大VPH", "vi": "VPH cao nhất"},
+    "outlier_avg_vph":  {"en": "Avg VPH", "ko": "평균 VPH", "ja": "平均VPH", "vi": "VPH trung bình"},
+    "outlier_avg_score": {"en": "Avg outlier", "ko": "평균 아웃라이어", "ja": "平均アウトライア", "vi": "Outlier TB"},
+    "outlier_window_7":  {"en": "Last 7 days", "ko": "최근 7일", "ja": "直近7日", "vi": "7 ngày qua"},
+    "outlier_window_14": {"en": "Last 14 days", "ko": "최근 14일", "ja": "直近14日", "vi": "14 ngày qua"},
+    "outlier_window_30": {"en": "Last 30 days", "ko": "최근 30일", "ja": "直近30日", "vi": "30 ngày qua"},
+    "outlier_csv":      {"en": "⬇ Download CSV", "ko": "⬇ CSV 다운로드", "ja": "⬇ CSVダウンロード", "vi": "⬇ Tải CSV"},
+
+    # Trend Pulse
+    "pulse_title":      {"en": "Trend Pulse 7d", "ko": "트렌드 펄스 7일", "ja": "トレンドパルス7日", "vi": "Trend Pulse 7d"},
+    "pulse_hot":        {"en": "🔥 HOT", "ko": "🔥 HOT", "ja": "🔥 HOT", "vi": "🔥 HOT"},
+    "pulse_cooling":    {"en": "📉 cooling", "ko": "📉 식는 중", "ja": "📉 冷却中", "vi": "📉 nguội"},
+    "pulse_stable":     {"en": "➡️ stable", "ko": "➡️ 안정", "ja": "➡️ 安定", "vi": "➡️ ổn định"},
+    "pulse_growth":     {"en": "Growth vs prior 7d", "ko": "이전 7일 대비 성장", "ja": "前7日比成長率", "vi": "Tăng trưởng vs 7d trước"},
+
+    # Keyword Score gauges (VidIQ-style)
+    "kw_score_panel":   {"en": "Keyword Score", "ko": "키워드 스코어", "ja": "キーワードスコア", "vi": "Keyword Score"},
+    "kw_volume":        {"en": "Volume", "ko": "볼륨", "ja": "ボリューム", "vi": "Volume"},
+    "kw_competition_g": {"en": "Competition", "ko": "경쟁", "ja": "競合", "vi": "Cạnh tranh"},
+    "kw_score_proxy_note": {"en": "Proxy score from autocomplete + YouTube search totals — not VidIQ.",
+                              "ko": "자동완성 + YouTube 검색 결과 기반 프록시 점수 — VidIQ 아님.",
+                              "ja": "オートコンプリート + YouTube検索結果のプロキシ。VidIQではありません。",
+                              "vi": "Điểm proxy từ autocomplete + tổng kết quả YouTube — không phải VidIQ thật."},
+    "kw_vph_top":       {"en": "VPH of top 10 results", "ko": "상위 10개 결과 VPH", "ja": "上位10件のVPH", "vi": "VPH của top 10 kết quả"},
 }
 
 
