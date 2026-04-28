@@ -6,6 +6,7 @@ import plotly.express as px
 import streamlit as st
 
 from core import youtube as yt
+from core import scoring
 from core.utils import humanize_int, parse_iso_duration
 
 st.set_page_config(page_title="Channel Analyzer", page_icon="📊", layout="wide")
@@ -79,16 +80,51 @@ if inp:
     fig = px.bar(by_month, x="publishedAt", y="videos", title="Videos / tháng")
     st.plotly_chart(fig, use_container_width=True)
 
+    # Outlier Score
+    df["outlier"] = scoring.outlier_scores(df["views"].tolist())
+    df["label"] = df["outlier"].apply(scoring.outlier_label)
+
     st.subheader("🏆 Top 10 video xem nhiều nhất")
     top = df.sort_values("views", ascending=False).head(10)
     st.dataframe(
-        top[["title", "views", "likes", "comments", "duration_sec", "publishedAt"]],
+        top[["title", "views", "outlier", "label", "likes", "comments", "duration_sec", "publishedAt"]],
         hide_index=True,
         use_container_width=True,
+        column_config={
+            "outlier": st.column_config.NumberColumn("Outlier", format="%.2fx"),
+        },
     )
+
+    st.subheader("⚡ Outlier scan")
+    viral = df[df["outlier"] >= 5].sort_values("outlier", ascending=False)
+    above = df[(df["outlier"] >= 2) & (df["outlier"] < 5)].sort_values("outlier", ascending=False)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"**🔥 Viral (≥5x median):** {len(viral)} videos")
+        if not viral.empty:
+            st.dataframe(viral[["title", "views", "outlier"]].head(10), hide_index=True, use_container_width=True)
+    with c2:
+        st.markdown(f"**📈 Trên TB (2-5x median):** {len(above)} videos")
+        if not above.empty:
+            st.dataframe(above[["title", "views", "outlier"]].head(10), hide_index=True, use_container_width=True)
+
+    st.subheader("⏰ Best Time to Post (theo top videos)")
+    bt = scoring.best_time_to_post(df, top_n=min(25, len(df)))
+    if bt["best_weekday"]:
+        b1, b2 = st.columns(2)
+        b1.metric("Ngày tốt nhất", bt["best_weekday"])
+        b2.metric("Giờ tốt nhất (VN)", f"{bt['best_hour']}:00")
+        wd_df = pd.DataFrame(bt["by_weekday"])
+        hr_df = pd.DataFrame(bt["by_hour"])
+        fig_wd = px.bar(wd_df, x="weekday", y="views", title="Tổng views theo ngày trong tuần")
+        fig_hr = px.bar(hr_df, x="hour", y="views", title="Tổng views theo giờ (VN UTC+7)")
+        st.plotly_chart(fig_wd, use_container_width=True)
+        st.plotly_chart(fig_hr, use_container_width=True)
 
     st.subheader("📋 Tất cả videos")
     st.dataframe(df, hide_index=True, use_container_width=True)
     st.download_button(
         "⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8"), file_name=f"{ch['id']}_videos.csv"
     )
+
+    st.info("💡 Muốn xem chấm điểm 0-100 cho kênh này? Mở **Channel Audit** ở sidebar.")
