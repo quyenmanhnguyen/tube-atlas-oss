@@ -75,8 +75,10 @@ with col1:
 with col2:
     st.metric("DeepSeek AI", "✅ Active" if ds_ok else "⚠️ Missing")
 with col3:
-    available = sum([yt_ok, yt_ok, ds_ok, ds_ok, True, True])
-    st.metric("Tools Available", f"{available}/6")
+    # 5 tools total: Research Hub + Channel Insights + Video Lab need YT;
+    # Long-form Studio needs DeepSeek; My Projects is offline.
+    available = sum([yt_ok, yt_ok, yt_ok, ds_ok, True])
+    st.metric("Tools Available", f"{available}/5")
 
 if not yt_ok or not ds_ok:
     with st.expander("⚙️ Cách lấy API Keys (miễn phí, 2 phút)"):
@@ -100,7 +102,7 @@ st.divider()
 # ─── Pillars ────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='font-size:1.35rem; font-weight:700; margin:8px 0 6px;'>"
-    "🛠️ 4 Pillars · 6 Tools</div>"
+    "🛠️ 4 Pillars · 5 Tools</div>"
     "<div style='color:#94a3b8; font-size:0.88rem; margin-bottom:14px;'>"
     "Click sidebar bên trái để mở từng tool. Mỗi tool gộp nhiều function "
     "trước đây (vd Channel Insights = Audit + Analyzer + Compare)."

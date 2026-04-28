@@ -36,7 +36,9 @@ with tab_pulse:
     with st.form("pulse_form"):
         c1, c2, c3 = st.columns([3, 1, 1])
         topic = c1.text_input("Chủ đề / niche", placeholder="VD: review iphone 17, AI agent, 말년운")
-        region = c2.selectbox("Khu vực", ["VN", "US", "JP", "KR", "ID", "TH"], index=0)
+        pulse_region = c2.selectbox(
+            "Khu vực", ["VN", "US", "JP", "KR", "ID", "TH"], index=0, key="pulse_reg"
+        )
         days = c3.slider("Số ngày", 7, 90, 30, 1)
         c4, c5, c6 = st.columns(3)
         inc_sent = c4.checkbox("Sentiment comment", value=True)
@@ -49,7 +51,7 @@ with tab_pulse:
         with st.spinner(f"Đang quét '{topic}' trong {days} ngày..."):
             data = research.niche_pulse(
                 topic.strip(),
-                region=region,
+                region=pulse_region,
                 days=days,
                 include_sentiment=inc_sent,
                 include_llm=inc_llm,
@@ -190,7 +192,9 @@ with tab_comp:
     with st.form("comp_form"):
         c1, c2, c3 = st.columns([3, 1, 1])
         handle = c1.text_input("Kênh seed (@handle hoặc Channel ID)", placeholder="@MrBeast")
-        region = c2.selectbox("Khu vực", ["VN", "US", "JP", "KR", "ID", "TH"], index=0, key="comp_reg")
+        comp_region = c2.selectbox(
+            "Khu vực", ["VN", "US", "JP", "KR", "ID", "TH"], index=0, key="comp_reg"
+        )
         top_n = c3.slider("Số đối thủ", 3, 15, 5)
         ok = st.form_submit_button("🔍 Tìm đối thủ", type="primary")
 
@@ -207,7 +211,7 @@ with tab_comp:
                 seed_id = ch["id"]
 
         with st.spinner(f"Extract keywords + scan {top_n*3} candidates..."):
-            data = competitors.discover_competitors(seed_id, region=region, top_n=top_n)
+            data = competitors.discover_competitors(seed_id, region=comp_region, top_n=top_n)
 
         if "error" in data:
             st.error(data["error"])
