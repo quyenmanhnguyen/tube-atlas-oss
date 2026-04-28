@@ -25,10 +25,11 @@ def _resolve_channel(inp: str) -> dict[str, Any] | None:
         return None
     try:
         if s.startswith("@") or "/@" in s:
-            handle = s.split("/@")[-1] if "/@" in s else s.lstrip("@")
+            raw = s.split("/@")[-1] if "/@" in s else s.lstrip("@")
+            handle = raw.split("/")[0].split("?")[0]
             return yt.channel_by_handle(handle)
         if "channel/" in s:
-            cid = s.split("channel/")[1].split("/")[0]
+            cid = s.split("channel/")[1].split("/")[0].split("?")[0]
             return (yt.channel_details([cid]) or [None])[0]
         return (yt.channel_details([s]) or [None])[0]
     except Exception:
