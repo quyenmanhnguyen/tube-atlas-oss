@@ -80,13 +80,20 @@ def videos_details(video_ids: list[str]) -> list[dict]:
 
 
 def channel_details(channel_ids: list[str]) -> list[dict]:
+    """Fetch channel details, batching IDs in chunks of 50 (YouTube API limit)."""
+    if not channel_ids:
+        return []
     yt = _client()
-    resp = yt.channels().list(
-        id=",".join(channel_ids),
-        part="snippet,statistics,brandingSettings,topicDetails",
-        maxResults=50,
-    ).execute()
-    return resp.get("items", [])
+    out: list[dict] = []
+    for i in range(0, len(channel_ids), 50):
+        chunk = channel_ids[i : i + 50]
+        resp = yt.channels().list(
+            id=",".join(chunk),
+            part="snippet,statistics,brandingSettings,topicDetails",
+            maxResults=50,
+        ).execute()
+        out.extend(resp.get("items", []))
+    return out
 
 
 def channel_by_handle(handle: str) -> dict | None:
