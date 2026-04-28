@@ -2,7 +2,7 @@
 
 # 📺 Tube Atlas OSS
 
-**Bộ công cụ nghiên cứu YouTube mã nguồn mở — thay thế Tube Atlas Premium / VidIQ / TubeBuddy**
+**Focused YouTube research & creator toolkit — find a niche, mine keywords, clone winning videos, ship scripts in EN/KO/JA/VI.**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-10%20features-7c3aed?style=for-the-badge" alt="10 features">
+<img src="https://img.shields.io/badge/Tools-5%20focused%20features-7c3aed?style=for-the-badge" alt="5 focused features">
 
 </div>
 
@@ -34,22 +34,26 @@
 
 ---
 
-## ✨ Tính năng
+## ✨ Features
 
-| # | Tool | Mô tả | Cần API key? |
+Five focused tools, organised in two tracks:
+
+### Research
+
+| # | Tool | What it does | API keys |
 |---|---|---|---|
-| 🔑 | **Keyword Generator** | Long-tail keywords từ YouTube Autocomplete | ❌ Free |
-| 📈 | **Trends Generator** | Google Trends cho YouTube + related queries | ❌ Free |
-| 🎬 | **Video Analyzer** | Stats, engagement, tags chi tiết | ✅ YouTube |
-| 📊 | **Channel Analyzer** | KPI kênh, upload frequency, top videos | ✅ YouTube |
-| ✨ | **Title Generator** | Gợi ý title CTR cao bằng AI | ✅ DeepSeek |
-| 📝 | **Video → Text** | Transcript / phụ đề từ YouTube | ❌ Free |
-| 🌀 | **Content Spinner** | Spin / rewrite nội dung bằng AI | ✅ DeepSeek |
-| 🕸️ | **Browser Extractor** | Search + scrape data bulk | ✅ YouTube |
-| 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
-| 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
+| 01 | **Niche Finder** | Trends + long-tail keywords + top channels + audience sentiment + AI verdict on whether the niche is hot/warm/cold. | YouTube + DeepSeek |
+| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete (optional A–Z expansion). | None |
+| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, 10 title clones, full script clone, thumbnail copy & SEO tags. | YouTube + DeepSeek |
 
-> **6/10 tools hoạt động ngay** mà không cần API key nào!
+### Create
+
+| # | Tool | What it does | API keys |
+|---|---|---|---|
+| 04 | **Script Writer** | Topic → full YouTube script (hook · body · CTA) in EN/KO/JA/VI. | DeepSeek |
+| 05 | **Title & Thumbnail Studio** | CTR-optimised titles, spoken hooks and thumbnail overlay copy. | DeepSeek |
+
+UI and AI output respect the language picker (English / 한국어 / 日本語 / Tiếng Việt) in the sidebar.
 
 ---
 
@@ -156,18 +160,21 @@ tube-atlas-oss/
 ├── core/
 │   ├── autocomplete.py   # YouTube keyword suggestions
 │   ├── comments.py       # Comment downloader (no API key)
+│   ├── i18n.py           # EN/KO/JA/VI strings + language selector
 │   ├── llm.py            # DeepSeek integration
-│   ├── theme.py          # Premium CSS module
+│   ├── theme.py          # Shared CSS + page_header helper
 │   ├── transcript.py     # YouTube transcript (no API key)
 │   ├── trends.py         # pytrends YouTube
 │   ├── utils.py          # Helpers
 │   └── youtube.py        # YouTube Data API v3 wrapper
-├── pages/                # 10 Streamlit pages
-│   ├── 1_Keyword_Generator.py
-│   ├── 2_Trends_Generator.py
-│   ├── ...
-│   └── 10_Shorts_Analyzer.py
-├── assets/               # Screenshots
+├── pages/
+│   ├── 01_Niche_Finder.py
+│   ├── 02_Keyword_Finder.py
+│   ├── 03_Video_Cloner.py
+│   ├── 04_Script_Writer.py
+│   └── 05_Title_Studio.py
+├── tests/                # pytest unit tests
+├── assets/
 └── requirements.txt
 ```
 
