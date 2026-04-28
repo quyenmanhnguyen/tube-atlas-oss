@@ -9,6 +9,7 @@ import streamlit as st
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from core import comments, llm, youtube as yt
+from core.utils import parse_count
 
 st.set_page_config(page_title="Comment Analyzer", page_icon="💬", layout="wide")
 from core.theme import inject; inject()
@@ -39,6 +40,7 @@ if ok and url.strip():
         st.stop()
 
     df = pd.DataFrame(cmts)[["author", "text", "votes", "time", "heart"]]
+    df["votes_n"] = df["votes"].apply(parse_count)
 
     if engine.startswith("VADER"):
         an = SentimentIntensityAnalyzer()
@@ -64,7 +66,13 @@ if ok and url.strip():
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Top comment")
-    st.dataframe(df.sort_values("votes", ascending=False, key=lambda s: s.astype(str)).head(50), hide_index=True, use_container_width=True)
+    st.dataframe(
+        df.sort_values("votes_n", ascending=False)
+        .drop(columns=["votes_n"])
+        .head(50),
+        hide_index=True,
+        use_container_width=True,
+    )
 
     if st.button("📋 Tóm tắt audience qua DeepSeek"):
         sample = "\n".join(df["text"].head(80).tolist())
@@ -73,5 +81,7 @@ if ok and url.strip():
             st.markdown(llm.chat(sample, system=sys, temperature=0.4))
 
     st.download_button(
-        "⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8"), file_name=f"comments_{vid}.csv"
+        "⬇️ Tải CSV",
+        df.drop(columns=["votes_n"]).to_csv(index=False).encode("utf-8"),
+        file_name=f"comments_{vid}.csv",
     )
