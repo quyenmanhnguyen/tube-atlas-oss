@@ -17,6 +17,7 @@ attribution.
 """
 from __future__ import annotations
 
+from core.pixelle.composer import ComposerOptions, make_short
 from core.pixelle.config import (
     ComfyUIConfig,
     LLMConfig,
@@ -24,16 +25,36 @@ from core.pixelle.config import (
     TTSConfig,
     load_config,
 )
+from core.pixelle.styles import STYLES, Style, get_style
+from core.pixelle.subtitles import (
+    Caption,
+    WordBoundary,
+    captions_to_srt,
+    fallback_captions_from_text,
+    group_word_boundaries,
+    split_by_sentences,
+)
 from core.pixelle.tts import EdgeTTSAdapter, TTSAdapter, TTSResult, synthesize
 
 __all__ = [
+    "STYLES",
+    "Caption",
     "ComfyUIConfig",
+    "ComposerOptions",
     "EdgeTTSAdapter",
     "LLMConfig",
     "PixelleConfig",
+    "Style",
     "TTSAdapter",
     "TTSConfig",
     "TTSResult",
+    "WordBoundary",
+    "captions_to_srt",
+    "fallback_captions_from_text",
+    "get_style",
+    "group_word_boundaries",
     "load_config",
+    "make_short",
+    "split_by_sentences",
     "synthesize",
 ]
