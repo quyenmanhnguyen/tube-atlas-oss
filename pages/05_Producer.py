@@ -24,12 +24,16 @@ import streamlit as st
 
 from core.i18n import language_selector, t
 from core.pixelle import (
+    ComfyUIVisualProvider,
     ComposerOptions,
     EdgeTTSAdapter,
     PRESET_NAMES,
     PixelleConfig,
     STYLES,
+    SceneAsset,
+    ScenePrompt,
     StyleSource,
+    UsePlaceholderFallback,
     VisualProvider,
     build_scene_prompts,
     fallback_captions_from_text,
@@ -177,7 +181,11 @@ def _resolve_style_source() -> StyleSource:
 
 
 def _provider_picker() -> VisualProvider:
-    """Render the provider dropdown + status pill, return the instance."""
+    """Render the provider dropdown + status pill, return the instance.
+
+    When ``comfyui_local`` is selected, an inline settings block surfaces
+    workflow JSON / checkpoint / seed knobs that the provider needs.
+    """
     specs = list_provider_specs()
     name_options = [s.name for s in specs]
     label_lookup = {s.name: s.label for s in specs}
@@ -188,7 +196,12 @@ def _provider_picker() -> VisualProvider:
         index=0,
         key="producer_provider_pick_select",
     )
-    provider = get_provider(provider_name)
+
+    if provider_name == "comfyui_local":
+        provider: VisualProvider = _build_comfyui_provider()
+    else:
+        provider = get_provider(provider_name)
+
     if provider.is_configured():
         st.success(
             t("producer_provider_ok").format(label=provider.info.label)
@@ -203,6 +216,52 @@ def _provider_picker() -> VisualProvider:
     if provider.info.notes:
         st.caption(provider.info.notes)
     return provider
+
+
+def _build_comfyui_provider() -> ComfyUIVisualProvider:
+    """Render ComfyUI-specific settings and return a configured provider."""
+    with st.container():
+        st.caption("⚙️ " + t("producer_comfy_settings"))
+        url_default = CFG.comfy.local_url
+        # The URL is read from config.load_config() inside the provider;
+        # surfacing it here is read-only for visibility.
+        st.text_input(
+            t("producer_comfy_url"),
+            value=url_default,
+            disabled=True,
+            key="producer_comfy_url_display",
+        )
+        workflow_str = st.text_input(
+            t("producer_comfy_workflow"),
+            value=st.session_state.get("producer_comfy_workflow", ""),
+            placeholder="(blank = bundled default_txt2img.json)",
+            key="producer_comfy_workflow_input",
+        )
+        checkpoint = st.text_input(
+            t("producer_comfy_checkpoint"),
+            value=st.session_state.get(
+                "producer_comfy_checkpoint", "v1-5-pruned-emaonly.safetensors"
+            ),
+            key="producer_comfy_checkpoint_input",
+        )
+        seed_str = st.text_input(
+            t("producer_comfy_seed"),
+            value=st.session_state.get("producer_comfy_seed", ""),
+            key="producer_comfy_seed_input",
+        )
+
+    workflow_path = Path(workflow_str).expanduser() if workflow_str.strip() else None
+    seed: int | None
+    try:
+        seed = int(seed_str) if seed_str.strip() else None
+    except ValueError:
+        seed = None
+
+    return ComfyUIVisualProvider(
+        workflow_path=workflow_path,
+        checkpoint=checkpoint or None,
+        seed=seed,
+    )
 
 
 with st.expander("🎨 " + t("producer_visual_section"), expanded=False):
@@ -239,6 +298,7 @@ def _run_pipeline(
     target_duration_s: int,
     config: PixelleConfig,
     output_dir: Path,
+    scene_assets: list[SceneAsset] | None = None,
 ) -> tuple[Path, str]:
     """Run TTS → captions → composite. Returns ``(mp4_path, caption_source_label)``."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -263,19 +323,88 @@ def _run_pipeline(
     progress.progress(60, text=t("producer_step_render"))
     mp4_path = output_dir / "short.mp4"
     options = ComposerOptions(style=style)
-    # PR-A3: visual provider is selected in the UI but only Placeholder is
-    # actually wired to the composer. Real ComfyUI / Whisk / Gemini / Grok
-    # integration lands in a follow-up PR. For now, non-placeholder picks
-    # silently fall back to the gradient Ken Burns background.
     make_short(
         audio_path,
         mp4_path,
         captions=captions,
         duration_hint=tts_result.duration_seconds or float(target_duration_s),
         options=options,
+        scene_assets=scene_assets,
     )
     progress.progress(100, text=t("producer_done"))
     return mp4_path, caption_source
+
+
+def _generate_scene_assets_via_comfyui(
+    *,
+    provider: ComfyUIVisualProvider,
+    scene_prompts: list[ScenePrompt],
+    audio_duration_s: float,
+    output_dir: Path,
+) -> list[SceneAsset] | None:
+    """Drive ComfyUI per scene; return :class:`SceneAsset` list on success.
+
+    Returns ``None`` (and surfaces a warning to the user) if any scene
+    fails — the caller falls back to the gradient placeholder. We do
+    all-or-nothing rather than mixing assets to keep the composer's
+    timeline consistent.
+    """
+    base_url = CFG.comfy.local_url
+    st.info(t("producer_comfy_probing").format(url=base_url))
+
+    # Health check before kicking off TTS-heavy work would be ideal, but
+    # the provider does its own probe inside generate_image. We still
+    # do one here to give an early warning + skip the inevitable per-
+    # scene retry storm if ComfyUI is down.
+    from core.pixelle.comfy_client import is_local_alive
+
+    if not is_local_alive(base_url):
+        st.warning(t("producer_comfy_down").format(url=base_url))
+        return None
+
+    images_dir = output_dir / "scenes"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    scene_progress = st.progress(0, text="")
+    assets: list[SceneAsset] = []
+    total_scene_seconds = sum(max(0.0, s.duration) for s in scene_prompts)
+    if total_scene_seconds <= 0:
+        return None
+    # Scale scene durations so they cover the actual audio length.
+    scale = audio_duration_s / total_scene_seconds if total_scene_seconds else 1.0
+    cursor = 0.0
+
+    for i, sp in enumerate(scene_prompts, start=1):
+        scene_progress.progress(
+            (i - 1) / max(1, len(scene_prompts)),
+            text=t("producer_comfy_scene_step").format(i=i, n=len(scene_prompts)),
+        )
+        out_path = images_dir / f"scene_{i:02d}.png"
+        try:
+            provider.generate_image(sp, output_path=out_path)
+        except UsePlaceholderFallback as exc:
+            st.warning(
+                t("producer_comfy_scene_fail").format(i=i, reason=str(exc))
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001 — any other failure also falls back
+            st.warning(
+                t("producer_comfy_scene_fail").format(i=i, reason=f"{type(exc).__name__}: {exc}")
+            )
+            return None
+        scaled_dur = max(0.5, sp.duration * scale)
+        assets.append(
+            SceneAsset(
+                image_path=out_path,
+                start_s=cursor,
+                duration_s=scaled_dur,
+            )
+        )
+        cursor += scaled_dur
+
+    scene_progress.progress(1.0, text="")
+    st.success(t("producer_comfy_using").format(n=len(assets)))
+    return assets
 
 
 if run_clicked:
@@ -283,35 +412,72 @@ if run_clicked:
         st.warning(t("producer_no_script"))
         st.stop()
 
-    # Warn if a non-Placeholder provider was selected — PR-A3 doesn't yet
-    # wire those to the composer, so the render will use the gradient
-    # background regardless. Users can still use the prompt JSON for
-    # external tools like Whisk / Grok.
-    if visual_provider.info.name != "placeholder":
-        st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
-
     voice_meta = voice_by_short_name(voice_short) or VOICES[0]
     out_dir = Path(tempfile.gettempdir()) / "tube-atlas-producer" / f"run-{int(time.time())}"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Pre-render: synthesize voice first so we know audio duration before
+    # spinning up ComfyUI (so per-scene durations can be scaled to fit).
+    audio_path = out_dir / "voice.mp3"
     try:
-        mp4, source_label = _run_pipeline(
-            script=script,
-            voice=voice_meta.short_name,
-            style=style_name,
-            target_duration_s=target_duration,
-            config=CFG,
-            output_dir=out_dir,
+        adapter = EdgeTTSAdapter(rate=CFG.tts.rate, volume=CFG.tts.volume)
+        tts_result = adapter.synthesize_with_timing(
+            script, output_path=audio_path, voice=voice_meta.short_name
         )
     except Exception as exc:  # noqa: BLE001 — surface any failure to the user
         st.error(f"{type(exc).__name__}: {exc}")
         st.stop()
 
-    st.success(t("producer_done") + f" · {source_label}")
-    st.video(str(mp4))
+    audio_duration = tts_result.duration_seconds or float(target_duration)
+
+    # Resolve scene assets if the user picked a real visual provider.
+    scene_assets: list[SceneAsset] | None = None
+    if visual_provider.info.name == "comfyui_local":
+        scene_prompts = build_scene_prompts(script, style_source)
+        scene_assets = _generate_scene_assets_via_comfyui(
+            provider=visual_provider,  # type: ignore[arg-type]
+            scene_prompts=scene_prompts,
+            audio_duration_s=audio_duration,
+            output_dir=out_dir,
+        )
+    elif visual_provider.info.name != "placeholder":
+        # Whisk / Gemini / Grok stubs — show the not-wired notice and
+        # use the gradient placeholder for the actual render.
+        st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
+
+    # Build captions + composite. Reuse the audio we already synthesized.
+    if tts_result.word_boundaries:
+        captions = group_word_boundaries(tts_result.word_boundaries)
+        caption_source = t("producer_caption_source_wb")
+    else:
+        captions = fallback_captions_from_text(
+            script, audio_duration_s=audio_duration
+        )
+        caption_source = t("producer_caption_source_fb")
+
+    mp4_path = out_dir / "short.mp4"
+    options = ComposerOptions(style=style_name)
+    progress = st.progress(60, text=t("producer_step_render"))
+    try:
+        make_short(
+            audio_path,
+            mp4_path,
+            captions=captions,
+            duration_hint=audio_duration,
+            options=options,
+            scene_assets=scene_assets,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface any failure to the user
+        st.error(f"{type(exc).__name__}: {exc}")
+        st.stop()
+    progress.progress(100, text=t("producer_done"))
+
+    st.success(t("producer_done") + f" · {caption_source}")
+    st.video(str(mp4_path))
     st.download_button(
         t("producer_download"),
-        data=mp4.read_bytes(),
-        file_name=mp4.name,
+        data=mp4_path.read_bytes(),
+        file_name=mp4_path.name,
         mime="video/mp4",
         use_container_width=True,
     )

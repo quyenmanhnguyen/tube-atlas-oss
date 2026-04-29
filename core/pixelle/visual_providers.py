@@ -175,27 +175,44 @@ class _StubVisualProvider(VisualProvider):
         )
 
 
-class ComfyUIVisualProvider(_StubVisualProvider):
-    """ComfyUI provider — talks to a local instance + RunningHub fallback.
+class ComfyUIVisualProvider(VisualProvider):
+    """ComfyUI provider — drives a local ComfyUI instance via HTTP.
 
-    Configuration is the same as the rest of the app: see
-    :class:`core.pixelle.config.ComfyUIConfig`. ``is_configured()``
-    returns ``True`` if either the local URL is reachable *or* the
-    RunningHub key is present. We don't actually probe the local URL
-    here (that requires a network call); we trust the user has it
-    running when they pick this provider.
+    PR-A3.1 wires real image generation through
+    :mod:`core.pixelle.comfyui_image`. The provider reports
+    ``is_configured()`` based on whether the local URL is set in config;
+    it doesn't probe the URL there (that's a network call). The actual
+    health check happens inside :meth:`generate_image`, and any failure
+    — server down, workflow missing, prompt rejected, output never
+    materialised — is translated into :class:`UsePlaceholderFallback`
+    so the Producer page keeps its gradient-fallback behaviour without
+    crashing the run.
     """
 
     info = ProviderInfo(
         name="comfyui_local",
         label="ComfyUI (local + RunningHub fallback)",
-        kind="image+video",
+        kind="image",
         requires=["ComfyUI at 127.0.0.1:8188 OR RUNNINGHUB_API_KEY"],
         notes=(
-            "Bring your own ComfyUI workflow. PR-A3 ships the abstraction; "
-            "real wiring lands in PR-A3.1 / PR-A4."
+            "Local-first: the provider posts the bundled txt2img workflow "
+            "to your ComfyUI instance and saves one image per scene. "
+            "If the server is down or the workflow fails, the run falls "
+            "back to the gradient Ken Burns placeholder (no crash)."
         ),
     )
+
+    def __init__(
+        self,
+        *,
+        workflow_path: Path | None = None,
+        checkpoint: str | None = None,
+        seed: int | None = None,
+    ) -> None:
+        self._workflow_path = workflow_path
+        # ``None`` defers to the default in :mod:`comfyui_image`.
+        self._checkpoint = checkpoint
+        self._seed = seed
 
     def is_configured(self) -> bool:
         cfg = load_config()
@@ -206,6 +223,41 @@ class ComfyUIVisualProvider(_StubVisualProvider):
         return (
             "ComfyUI not configured: set COMFYUI_LOCAL_URL (default "
             "http://127.0.0.1:8188) or RUNNINGHUB_API_KEY."
+        )
+
+    def generate_image(self, prompt: ScenePrompt, *, output_path: Path) -> Path:
+        if not self.is_configured():
+            raise ProviderNotConfiguredError(self.missing_reason())
+
+        # Lazy import: keeps `core.pixelle` import cheap and lets unit
+        # tests patch the orchestrator without dragging requests in.
+        from core.pixelle import comfyui_image
+        from core.pixelle.comfy_client import ComfyUIError
+
+        cfg = load_config()
+        try:
+            return comfyui_image.generate_scene_image(
+                prompt,
+                output_path=output_path,
+                base_url=cfg.comfy.local_url,
+                workflow_path=self._workflow_path,
+                checkpoint=self._checkpoint or comfyui_image.DEFAULT_CHECKPOINT,
+                seed=self._seed,
+            )
+        except ComfyUIError as exc:
+            # Translate any ComfyUI-side failure into the placeholder
+            # signal so the Producer page can fall back gracefully.
+            raise UsePlaceholderFallback(
+                f"ComfyUI generate failed → falling back to placeholder: {exc}"
+            ) from exc
+
+    def generate_video(self, prompt: ScenePrompt, *, output_path: Path) -> Path | None:
+        # Video wiring lands in a follow-up PR. Until then this stays a
+        # stub so the Producer page knows to fall back.
+        if not self.is_configured():
+            raise ProviderNotConfiguredError(self.missing_reason())
+        raise ProviderNotImplementedError(
+            f"{self.info.label}: video API integration is not wired yet."
         )
 
 
