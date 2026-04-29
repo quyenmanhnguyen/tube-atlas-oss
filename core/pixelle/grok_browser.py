@@ -78,9 +78,18 @@ class GrokLoginFailed(GrokBrowserError):
 
 @dataclass(frozen=True)
 class GrokLoginOptions:
-    """Tunables for :func:`grok_browser_login`."""
+    """Tunables for :func:`grok_browser_login`.
 
-    headless: bool = True
+    ``headless`` defaults to ``False`` because Cloudflare currently
+    challenges every headless Chromium that hits ``accounts.x.ai``
+    (the page returns ``Attention Required! | Cloudflare`` and no
+    inputs render). A windowed Chromium passes the challenge cleanly.
+    Server / docker callers without an X server should run under
+    ``xvfb-run`` or override ``headless=True`` and accept the risk of
+    the bot challenge.
+    """
+
+    headless: bool = False
     timeout_ms: int = DEFAULT_LOGIN_TIMEOUT_MS
     request_wait_ms: int = DEFAULT_REQUEST_WAIT_MS
 
@@ -185,6 +194,35 @@ def _drive_login_form(
     page.set_default_timeout(opts.timeout_ms)
     page.goto(SIGN_IN_URL, wait_until="domcontentloaded")
 
+    # accounts.x.ai serves an OneTrust cookie banner that overlays the
+    # login buttons until dismissed. Best-effort click the accept button
+    # — failures here are non-fatal because the banner only steals
+    # clicks, not keyboard input.
+    _try_click(
+        page,
+        [
+            "#onetrust-accept-btn-handler",
+            "button:has-text('Allow All')",
+            "button:has-text('Accept All')",
+        ],
+        timeout_ms=2_000,
+    )
+
+    # The sign-in screen now leads with social-provider buttons
+    # ("Login with 𝕏", "Login with Google", "Login with email"…).
+    # The email/password form only renders after the user picks the
+    # email path. Click that button if present; otherwise fall through
+    # and hope a single-step layout was served.
+    _try_click(
+        page,
+        [
+            "button:has-text('Login with email')",
+            "button:has-text('Sign in with email')",
+            "button:has-text('Continue with email')",
+        ],
+        timeout_ms=4_000,
+    )
+
     # x.ai sometimes presents email + password on one screen, sometimes
     # email-then-password. Try both common selectors before falling
     # back to a generic ``input[type=...]`` query.
@@ -195,6 +233,7 @@ def _drive_login_form(
             "input[type=email]",
             "input[autocomplete=username]",
         ],
+        wait_timeout_ms=15_000,
     )
     if email_input is None:
         raise GrokLoginFailed("Could not find the email input on accounts.x.ai/sign-in.")
@@ -274,8 +313,23 @@ def _trigger_statsig_request(page: "Page", *, opts: GrokLoginOptions) -> None:
         LOG.warning("Did not observe an x-statsig-id header during login.")
 
 
-def _first_visible_locator(page: "Page", selectors: list[str]):
-    """Return the first selector with at least one visible match."""
+def _first_visible_locator(
+    page: "Page", selectors: list[str], *, wait_timeout_ms: int = 0
+):
+    """Return the first selector with at least one visible match.
+
+    If ``wait_timeout_ms`` is > 0, wait up to that long for any of the
+    candidate selectors to become visible (useful when the page swaps
+    in a new form after a button click — the email input on x.ai
+    appears ~1–3 s after pressing "Login with email").
+    """
+    if wait_timeout_ms > 0:
+        try:
+            page.wait_for_selector(
+                ", ".join(selectors), state="visible", timeout=wait_timeout_ms
+            )
+        except Exception:  # noqa: BLE001 — fall through to per-selector probe
+            pass
     for sel in selectors:
         loc = page.locator(sel)
         try:
@@ -284,6 +338,19 @@ def _first_visible_locator(page: "Page", selectors: list[str]):
         except Exception:  # noqa: BLE001 — Playwright can race here
             continue
     return None
+
+
+def _try_click(page: "Page", selectors: list[str], *, timeout_ms: int) -> bool:
+    """Best-effort click on the first visible selector. Returns True on
+    success. Never raises — used for optional UI dismissals."""
+    loc = _first_visible_locator(page, selectors, wait_timeout_ms=timeout_ms)
+    if loc is None:
+        return False
+    try:
+        loc.click(timeout=timeout_ms)
+        return True
+    except Exception:  # noqa: BLE001 — best-effort
+        return False
 
 
 def _maybe_capture_headers(req, sink: dict[str, str]) -> None:

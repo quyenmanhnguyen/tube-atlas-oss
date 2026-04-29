@@ -40,7 +40,9 @@ def test_login_raises_unavailable_when_playwright_missing(monkeypatch):
 
 def test_login_options_defaults():
     o = GrokLoginOptions()
-    assert o.headless is True
+    # Defaults to a windowed Chromium because Cloudflare challenges
+    # every headless one that hits accounts.x.ai/sign-in.
+    assert o.headless is False
     assert o.timeout_ms > 0
     assert o.request_wait_ms > 0
 
