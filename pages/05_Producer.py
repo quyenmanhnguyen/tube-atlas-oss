@@ -1,17 +1,22 @@
 """Producer — turn a Studio script into a 9:16 short with voice + captions.
 
-PR-A2 shipped placeholder visuals (gradient + Ken Burns). PR-A3 layers
-on a **prompt generator + provider abstraction** so users can:
+PR-A2 shipped placeholder visuals (gradient + Ken Burns). PR-A3 layered
+on a **prompt generator + provider abstraction**. PR-A3.1 wired the
+ComfyUI local provider for per-scene image generation.
 
-1. Pick a style source — Video Cloner kit, manual reference text, or a
-   named preset.
-2. Split the script into scenes and preview a JSON list of
-   image / video prompts ready to paste into Whisk, Grok, Imagen, etc.
-3. Pick a visual provider (Placeholder by default; ComfyUI, Whisk,
-   Gemini, Grok stubs are listed but not wired yet — they'll fall back
-   to gradient + warn the user).
+PR-A4.1 adds a second mode: **Long-form scene breakdown**. Instead of
+rendering a 45 s short, the page expands a long ``script_final.md`` into
+``N`` standalone scenes — each with an ultra-detailed image prompt and a
+3–4 sentence flow video prompt — paste-ready for AutoGrok, grok.com web,
+Veo 3, Whisk, etc. Image / video generation is deferred to PR-A4.2 (Grok
+image) and PR-A5 (Veo 3 video).
 
-The script input is still plain text and this page never calls the LLM.
+Mode picker:
+
+- ``short`` (default) — PR-A2/A3/A3.1 flow: TTS → captions → composite
+  9:16 mp4 with optional ComfyUI scene images.
+- ``long_form`` — PR-A4.1 flow: pick a template + scene count → call LLM
+  → render a per-scene table + downloads (``.md`` and ``.json``).
 """
 from __future__ import annotations
 
@@ -29,22 +34,34 @@ from core.pixelle import (
     EdgeTTSAdapter,
     PRESET_NAMES,
     PixelleConfig,
+    SCENE_TEMPLATES,
     STYLES,
+    TEMPLATE_KEYS,
+    LongFormScene,
     SceneAsset,
     ScenePrompt,
+    SceneTemplate,
     StyleSource,
     UsePlaceholderFallback,
     VisualProvider,
     build_scene_prompts,
+    build_thumbnail_prompt,
+    count_words,
+    estimate_scene_count,
+    estimate_total_duration_s,
     fallback_captions_from_text,
     from_cloner_kit,
     from_manual_reference,
     from_preset,
+    generate_scene_breakdown,
     get_provider,
     group_word_boundaries,
     list_provider_specs,
     load_config,
+    make_custom_template,
     make_short,
+    serialize_breakdown_json,
+    serialize_breakdown_md,
 )
 from core.pixelle.voices import VOICES, voice_by_short_name, voice_labels, voice_short_names
 from core.theme import inject, page_header
@@ -83,7 +100,246 @@ with st.expander("⚙️ " + t("producer_status"), expanded=False):
     st.json(summary, expanded=False)
 
 
-# ─── Inputs ──────────────────────────────────────────────────────────────────
+# ─── Long-form scene-breakdown mode (PR-A4.1) ───────────────────────────────
+def _resolve_long_form_script() -> str:
+    """Pick the long-form script body from one of three sources.
+
+    1. ``Studio`` — pulled from ``st.session_state["studio"]["script_final"]``
+       (the same handoff the short mode uses for prefilling).
+    2. ``Upload`` — ``.md`` / ``.txt`` via :func:`st.file_uploader`.
+    3. ``Paste`` — free-form textarea (default for fresh sessions).
+
+    Returns the raw body text. The caller decides what to do if empty.
+    """
+    studio = st.session_state.get("studio") or {}
+    has_studio_script = bool(studio.get("script_final"))
+    options = (
+        ["studio", "upload", "paste"] if has_studio_script else ["upload", "paste"]
+    )
+    label = {
+        "studio": t("producer_lf_source_studio"),
+        "upload": t("producer_lf_source_upload"),
+        "paste": t("producer_lf_source_paste"),
+    }
+    pick = st.radio(
+        t("producer_lf_source"),
+        options=options,
+        format_func=lambda v: label.get(v, v),
+        horizontal=True,
+        key="producer_lf_source_pick",
+    )
+    if pick == "studio":
+        return str(studio.get("script_final") or "")
+    if pick == "upload":
+        upload = st.file_uploader(
+            t("producer_lf_upload"),
+            type=["md", "txt"],
+            key="producer_lf_upload_input",
+        )
+        if upload is None:
+            return ""
+        try:
+            return upload.read().decode("utf-8", errors="replace")
+        except (OSError, UnicodeDecodeError):
+            return ""
+    return st.text_area(
+        t("producer_script"),
+        value=st.session_state.get("producer_lf_paste_text", ""),
+        height=320,
+        placeholder="Paste a long-form script (any length)…",
+        key="producer_lf_paste_text",
+    )
+
+
+def _resolve_template() -> SceneTemplate:
+    """Pick a built-in template or build a custom one from inline inputs."""
+    keys = TEMPLATE_KEYS
+    labels = {k: SCENE_TEMPLATES[k].label for k in keys}
+    pick = st.selectbox(
+        t("producer_lf_template"),
+        options=keys,
+        format_func=lambda k: labels.get(k, k),
+        index=keys.index("factory") if "factory" in keys else 0,
+        key="producer_lf_template_pick",
+    )
+    st.caption(t("producer_lf_template_hint"))
+    base = SCENE_TEMPLATES[pick]
+    if pick != "custom":
+        st.caption(base.description)
+        return base
+    style_tag = st.text_input(
+        t("producer_lf_template_custom_style"),
+        value=st.session_state.get(
+            "producer_lf_custom_style",
+            "ultra-realistic, cinematic, high-detail 4K, documentary style",
+        ),
+        key="producer_lf_custom_style",
+    )
+    camera = st.text_input(
+        t("producer_lf_template_custom_camera"),
+        value=st.session_state.get(
+            "producer_lf_custom_camera",
+            "tracking shot, dolly push, smooth motion",
+        ),
+        key="producer_lf_custom_camera",
+    )
+    process = st.text_area(
+        t("producer_lf_template_custom_process"),
+        value=st.session_state.get("producer_lf_custom_process", ""),
+        height=80,
+        placeholder="(optional) extra rules every scene must follow",
+        key="producer_lf_custom_process",
+    )
+    return make_custom_template(
+        image_style_tag=style_tag,
+        camera_hints=camera,
+        process_notes=process,
+    )
+
+
+def _render_long_form_mode() -> None:
+    """Long-form pipeline: script → LLM-driven scene breakdown table."""
+    st.subheader("📝 " + t("producer_lf_section"))
+    script_lf = _resolve_long_form_script()
+
+    template = _resolve_template()
+
+    words = count_words(script_lf)
+    auto_n_scenes = estimate_scene_count(script_lf) if words else 0
+    col_a, col_b, col_c = st.columns(3, gap="medium")
+    with col_a:
+        wpm = st.slider(
+            t("producer_lf_wpm"),
+            min_value=90,
+            max_value=200,
+            value=int(st.session_state.get("producer_lf_wpm", 150)),
+            step=5,
+            key="producer_lf_wpm",
+        )
+    with col_b:
+        n_scenes = st.slider(
+            t("producer_lf_n_scenes"),
+            min_value=3,
+            max_value=60,
+            value=max(3, auto_n_scenes or 8),
+            step=1,
+            key="producer_lf_n_scenes",
+        )
+    with col_c:
+        thumbnail_title = st.text_input(
+            t("producer_lf_thumbnail_title"),
+            value=st.session_state.get("producer_lf_thumbnail_title", ""),
+            placeholder="Title for thumbnail prompt…",
+            key="producer_lf_thumbnail_title",
+        )
+
+    if words:
+        minutes = round(estimate_total_duration_s(script_lf, words_per_minute=wpm) / 60.0, 1)
+        st.caption(
+            t("producer_lf_stats").format(
+                words=words, minutes=minutes, wpm=wpm, n_scenes=n_scenes
+            )
+        )
+
+    run_lf = st.button(
+        t("producer_lf_run"),
+        type="primary",
+        use_container_width=True,
+        key="producer_lf_run_btn",
+    )
+
+    if run_lf:
+        if not script_lf.strip():
+            st.warning(t("producer_lf_no_script"))
+        else:
+            with st.spinner(t("producer_lf_running")):
+                try:
+                    scenes = generate_scene_breakdown(
+                        script_lf,
+                        template=template,
+                        n_scenes=n_scenes,
+                        words_per_minute=wpm,
+                    )
+                except Exception as exc:  # noqa: BLE001 — surface to user
+                    st.error(f"{type(exc).__name__}: {exc}")
+                    scenes = []
+            st.session_state["producer_lf_scenes"] = [s.to_json() for s in scenes]
+            st.session_state["producer_lf_template_key"] = template.key
+            st.session_state["producer_lf_thumbnail_used_title"] = thumbnail_title
+            if not scenes:
+                st.warning(t("producer_lf_no_scenes"))
+
+    cached = st.session_state.get("producer_lf_scenes") or []
+    if cached:
+        st.success(t("producer_lf_result_count").format(n=len(cached)))
+        st.caption(t("producer_lf_table_caption"))
+        for s in cached:
+            with st.expander(
+                f"Scene {s['scene_id']} · {s['title']}  ·  ~{s['duration_s']:.1f}s",
+                expanded=False,
+            ):
+                st.markdown("**Narration**")
+                st.code(s["narration"], language="markdown")
+                st.markdown("**Image prompt**")
+                st.code(s["image_prompt"], language="markdown")
+                st.markdown("**Flow video prompt**")
+                st.code(s["flow_video_prompt"], language="markdown")
+        used_template = SCENE_TEMPLATES.get(
+            st.session_state.get("producer_lf_template_key", "factory"),
+            SCENE_TEMPLATES["factory"],
+        )
+        scene_objs = [LongFormScene(**s) for s in cached]
+        md_blob = serialize_breakdown_md(
+            scene_objs,
+            title=thumbnail_title or "",
+            template=used_template,
+        )
+        json_blob = json.dumps(
+            serialize_breakdown_json(scene_objs), ensure_ascii=False, indent=2
+        )
+
+        col_md, col_json = st.columns(2)
+        with col_md:
+            st.download_button(
+                t("producer_lf_download_md"),
+                data=md_blob.encode("utf-8"),
+                file_name="breakdown.md",
+                mime="text/markdown",
+                use_container_width=True,
+                key="producer_lf_download_md_btn",
+            )
+        with col_json:
+            st.download_button(
+                t("producer_lf_download_json"),
+                data=json_blob.encode("utf-8"),
+                file_name="breakdown.json",
+                mime="application/json",
+                use_container_width=True,
+                key="producer_lf_download_json_btn",
+            )
+
+        if thumbnail_title.strip():
+            with st.expander(t("producer_lf_thumbnail"), expanded=False):
+                thumb = build_thumbnail_prompt(thumbnail_title, used_template)
+                st.code(thumb, language="markdown")
+
+
+# ─── Mode picker ─────────────────────────────────────────────────────────────
+mode = st.radio(
+    t("producer_mode"),
+    options=["short", "long_form"],
+    format_func=lambda v: t(f"producer_mode_{v}"),
+    horizontal=True,
+    index=0,
+    key="producer_mode_pick",
+)
+
+if mode == "long_form":
+    _render_long_form_mode()
+    st.stop()
+
+
+# ─── Inputs (short mode) ─────────────────────────────────────────────────────
 left, right = st.columns([3, 2], gap="large")
 
 with left:
