@@ -17,6 +17,15 @@ from core.pixelle.styles import get_style
 from core.pixelle.subtitles import Caption
 
 
+def test_pillow_antialias_shim_applied():
+    """moviepy 1.x calls ``PIL.Image.ANTIALIAS`` from its resize fx; the
+    composer module patches it back in for Pillow >= 10."""
+    from PIL import Image
+
+    assert hasattr(Image, "ANTIALIAS")
+    assert Image.ANTIALIAS == Image.Resampling.LANCZOS
+
+
 def test_render_gradient_background_creates_png(tmp_path):
     out = tmp_path / "bg.png"
     style = get_style("violet-pink")

@@ -22,6 +22,13 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+# moviepy 1.x calls ``PIL.Image.ANTIALIAS`` from its resize fx, but Pillow
+# 10 removed that alias in favour of ``Image.Resampling.LANCZOS``. Patch
+# it back in so the bundled Ken Burns ``.resize()`` keeps working with
+# modern Pillow. Safe no-op when Pillow still exposes the attribute.
+if not hasattr(Image, "ANTIALIAS"):  # pragma: no cover — environment shim
+    Image.ANTIALIAS = Image.Resampling.LANCZOS  # type: ignore[attr-defined]
+
 from core.pixelle.styles import Style, get_style
 from core.pixelle.subtitles import Caption
 
