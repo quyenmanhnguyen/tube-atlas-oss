@@ -72,6 +72,23 @@ class SceneAsset:
     duration_s: float
 
 
+@dataclass(frozen=True)
+class VideoSceneAsset:
+    """One pre-rendered video clip backing a scene.
+
+    PR-A5 introduces real video generation via Grok / Veo 3. Each
+    clip arrives as an mp4 on disk; the composer trims it to
+    ``duration_s`` (looping if shorter than the requested duration),
+    resizes it to cover the canvas with center-cropping, and pins it
+    to ``start_s`` on the timeline. No Ken Burns is applied — the
+    clip already carries motion.
+    """
+
+    video_path: Path
+    start_s: float
+    duration_s: float
+
+
 def make_short(
     audio_path: Path,
     output_path: Path,
@@ -80,6 +97,7 @@ def make_short(
     duration_hint: float | None = None,
     options: ComposerOptions | None = None,
     scene_assets: list[SceneAsset] | None = None,
+    video_scene_assets: list[VideoSceneAsset] | None = None,
 ) -> Path:
     """Compose audio + placeholder background + captions into an mp4.
 
@@ -125,7 +143,18 @@ def make_short(
     cleanup_paths: list[Path] = []
     layers: list = []
 
-    if scene_assets:
+    if video_scene_assets:
+        # Priority: video clips > image clips > gradient. Video clips
+        # already carry motion, so the composer skips Ken Burns and
+        # only handles cropping / fitting.
+        layers.extend(
+            _video_scene_clips(
+                video_scene_assets,
+                opts=opts,
+                total_duration=duration,
+            )
+        )
+    elif scene_assets:
         layers.extend(
             _scene_clips(
                 scene_assets,
@@ -240,6 +269,66 @@ def _scene_clips(
             .set_position(("center", "center"))
         )
         clips.append(clip)
+    return clips
+
+
+def _video_scene_clips(
+    assets: list[VideoSceneAsset],
+    *,
+    opts: ComposerOptions,
+    total_duration: float,
+) -> list:
+    """Turn a list of :class:`VideoSceneAsset` into placed VideoFileClips.
+
+    Each clip is loaded once, **trimmed** to ``duration_s`` (if the
+    source is longer) or **looped** to cover ``duration_s`` (if the
+    source is shorter), then resized to cover the canvas while
+    preserving aspect ratio. Sub-clips are muted — the audio track
+    is the TTS narration, not whatever Veo decided to embed.
+
+    Tail past ``total_duration`` is clamped to keep the composer's
+    timeline aligned with the audio.
+    """
+    from moviepy.editor import VideoFileClip, vfx
+
+    clips: list = []
+    for asset in assets:
+        if asset.duration_s <= 0:
+            continue
+        start = max(0.0, float(asset.start_s))
+        end = min(total_duration, start + float(asset.duration_s))
+        clip_duration = max(0.05, end - start)
+
+        source = VideoFileClip(str(asset.video_path)).without_audio()
+        try:
+            source_duration = float(source.duration or 0.0)
+        except Exception:  # noqa: BLE001 — moviepy probe failures fall through
+            source_duration = 0.0
+
+        if source_duration <= 0:
+            source.close()
+            continue
+
+        if source_duration >= clip_duration:
+            # Trim. ``subclip`` returns a new clip; close the parent.
+            scene = source.subclip(0, clip_duration)
+        else:
+            # Loop to cover the full requested duration.
+            scene = source.fx(vfx.loop, duration=clip_duration)
+
+        # Cover-fit: scale so the shorter axis matches the canvas, then
+        # center the clip. ``resize`` preserves aspect ratio when given
+        # a single dimension.
+        scene = scene.resize(height=opts.height)
+        if scene.w < opts.width:
+            scene = scene.resize(width=opts.width)
+
+        scene = (
+            scene.set_start(start)
+            .set_duration(clip_duration)
+            .set_position(("center", "center"))
+        )
+        clips.append(scene)
     return clips
 
 

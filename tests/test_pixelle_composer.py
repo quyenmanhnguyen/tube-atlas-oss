@@ -330,6 +330,229 @@ def test_make_short_with_scene_assets_uses_scene_clips_not_gradient(
     assert not out.with_suffix(".bg.png").exists()
 
 
+# ─── PR-A5: video_scene_assets path (per-scene VideoFileClip) ───────────────
+
+
+def _install_video_moviepy_stub(monkeypatch, *, source_duration: float = 6.0):
+    """Install a fake ``moviepy.editor`` module exposing the bits
+    ``_video_scene_clips`` needs (``VideoFileClip`` + ``vfx.loop``).
+
+    Returns a tuple ``(fake_module, source_clip_factory)`` where
+    ``source_clip_factory`` produces a fresh ``MagicMock`` per call —
+    one clip per :class:`VideoSceneAsset`.
+    """
+    created: list[MagicMock] = []
+
+    def _make_source(*args, **kwargs):
+        clip = MagicMock()
+        clip.duration = source_duration
+        clip.w = 640
+        clip.h = 480
+        # All chainable methods return the same MagicMock so we can
+        # assert against the final state.
+        for method in (
+            "without_audio",
+            "subclip",
+            "fx",
+            "resize",
+            "set_start",
+            "set_duration",
+            "set_position",
+            "close",
+        ):
+            getattr(clip, method).return_value = clip
+        created.append(clip)
+        return clip
+
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.VideoFileClip = MagicMock(side_effect=_make_source)
+    # vfx.loop is just sentinel-passed to ``.fx()`` — its identity
+    # doesn't matter for our assertions.
+    fake_vfx = types.SimpleNamespace(loop="LOOP_FX")
+    fake_module.vfx = fake_vfx
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+    return fake_module, created
+
+
+def test_video_scene_clips_creates_one_clip_per_asset(monkeypatch, tmp_path):
+    fake_module, created = _install_video_moviepy_stub(
+        monkeypatch, source_duration=6.0
+    )
+
+    v1 = tmp_path / "scene_01.mp4"
+    v1.write_bytes(b"x")
+    v2 = tmp_path / "scene_02.mp4"
+    v2.write_bytes(b"y")
+    assets = [
+        composer.VideoSceneAsset(video_path=v1, start_s=0.0, duration_s=4.0),
+        composer.VideoSceneAsset(video_path=v2, start_s=4.0, duration_s=3.0),
+    ]
+
+    clips = composer._video_scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=7.0
+    )
+
+    assert len(clips) == 2
+    assert fake_module.VideoFileClip.call_count == 2
+    # Source duration (6s) >= requested 4s → use subclip(0, 4.0) trim path.
+    created[0].subclip.assert_called_with(0, 4.0)
+    # Same for the second scene (6s >= 3s).
+    created[1].subclip.assert_called_with(0, 3.0)
+    # Both clips end up positioned at center,center.
+    for clip in created:
+        clip.set_position.assert_called_with(("center", "center"))
+
+
+def test_video_scene_clips_loops_short_source(monkeypatch, tmp_path):
+    """Source shorter than requested duration → loop via ``vfx.loop``."""
+    fake_module, created = _install_video_moviepy_stub(
+        monkeypatch, source_duration=2.0
+    )
+
+    v = tmp_path / "scene.mp4"
+    v.write_bytes(b"x")
+    assets = [composer.VideoSceneAsset(video_path=v, start_s=0.0, duration_s=6.0)]
+
+    composer._video_scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=10.0
+    )
+
+    # Should have called ``.fx(vfx.loop, duration=6.0)`` instead of subclip.
+    created[0].fx.assert_called_with("LOOP_FX", duration=6.0)
+    created[0].subclip.assert_not_called()
+
+
+def test_video_scene_clips_clamps_overflow_to_total_duration(monkeypatch, tmp_path):
+    fake_module, created = _install_video_moviepy_stub(
+        monkeypatch, source_duration=10.0
+    )
+    v = tmp_path / "scene.mp4"
+    v.write_bytes(b"x")
+    assets = [composer.VideoSceneAsset(video_path=v, start_s=4.0, duration_s=10.0)]
+
+    composer._video_scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=5.0
+    )
+
+    duration_arg = created[0].set_duration.call_args.args[0]
+    assert duration_arg == pytest.approx(1.0)
+
+
+def test_video_scene_clips_skips_zero_duration(monkeypatch, tmp_path):
+    fake_module, created = _install_video_moviepy_stub(monkeypatch)
+    v = tmp_path / "scene.mp4"
+    v.write_bytes(b"x")
+    assets = [composer.VideoSceneAsset(video_path=v, start_s=0.0, duration_s=0.0)]
+
+    clips = composer._video_scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=5.0
+    )
+    assert clips == []
+    fake_module.VideoFileClip.assert_not_called()
+
+
+def test_video_scene_clips_skips_unprobeable_sources(monkeypatch, tmp_path):
+    """A source clip whose ``.duration`` is ``None`` (probe failed) is
+    silently dropped — no exception, no clip emitted.
+    """
+    created: list[MagicMock] = []
+
+    def _make_source(*a, **kw):
+        clip = MagicMock()
+        clip.duration = None
+        clip.w = 640
+        clip.h = 480
+        for method in ("without_audio", "close"):
+            getattr(clip, method).return_value = clip
+        created.append(clip)
+        return clip
+
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.VideoFileClip = MagicMock(side_effect=_make_source)
+    fake_module.vfx = types.SimpleNamespace(loop="LOOP_FX")
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    v = tmp_path / "broken.mp4"
+    v.write_bytes(b"x")
+    clips = composer._video_scene_clips(
+        [composer.VideoSceneAsset(video_path=v, start_s=0.0, duration_s=2.0)],
+        opts=composer.ComposerOptions(),
+        total_duration=5.0,
+    )
+    assert clips == []
+    created[0].close.assert_called_once()
+
+
+def test_make_short_video_assets_take_priority_over_image_assets(monkeypatch, tmp_path):
+    """When both ``video_scene_assets`` and ``scene_assets`` are passed,
+    only the video path runs (no Ken-Burns'd ImageClips).
+    """
+    audio = tmp_path / "v.mp3"
+    audio.write_bytes(b"fake-mp3")
+    out = tmp_path / "out.mp4"
+
+    fake_audio = MagicMock()
+    fake_audio.duration = 6.0
+    fake_audio.close = MagicMock()
+
+    video_clip = MagicMock()
+    video_clip.duration = 6.0
+    video_clip.w = 640
+    video_clip.h = 480
+    for method in (
+        "without_audio",
+        "subclip",
+        "fx",
+        "resize",
+        "set_start",
+        "set_duration",
+        "set_position",
+    ):
+        getattr(video_clip, method).return_value = video_clip
+
+    fake_image_clip_factory = MagicMock()  # should never fire
+
+    fake_composite = MagicMock()
+    fake_composite.set_duration.return_value = fake_composite
+    fake_composite.set_audio.return_value = fake_composite
+    fake_composite.write_videofile = MagicMock()
+    fake_composite.close = MagicMock()
+
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.AudioFileClip = MagicMock(return_value=fake_audio)
+    fake_module.ImageClip = fake_image_clip_factory
+    fake_module.VideoFileClip = MagicMock(return_value=video_clip)
+    fake_module.vfx = types.SimpleNamespace(loop="LOOP_FX")
+    fake_module.CompositeVideoClip = MagicMock(return_value=fake_composite)
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    monkeypatch.setattr(
+        composer, "_render_gradient_background", lambda *a, **k: None
+    )
+
+    img = tmp_path / "scene_01.png"
+    img.write_bytes(b"x")
+    video = tmp_path / "scene_01.mp4"
+    video.write_bytes(b"y")
+
+    composer.make_short(
+        audio,
+        out,
+        scene_assets=[
+            composer.SceneAsset(image_path=img, start_s=0.0, duration_s=6.0),
+        ],
+        video_scene_assets=[
+            composer.VideoSceneAsset(video_path=video, start_s=0.0, duration_s=6.0),
+        ],
+        captions=None,
+    )
+
+    # Video path ran exactly once.
+    assert fake_module.VideoFileClip.call_count == 1
+    # Image path did NOT run despite ``scene_assets`` being passed.
+    fake_image_clip_factory.assert_not_called()
+
+
 # ─── Path overlap test for caption layout (math, not rendering) ─────────────
 def test_caption_clips_position_and_timing_math(monkeypatch):
     """Verify start/duration/y-offset are correctly applied to each caption clip."""
