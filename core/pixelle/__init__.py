@@ -1,0 +1,39 @@
+"""Pixelle-style production pipeline (vendored, Apache-2.0).
+
+This subpackage provides the building blocks for turning a Studio script
+into a finished short video:
+
+- :mod:`core.pixelle.config` — provider configuration (local-first ComfyUI,
+  RunningHub fallback, DeepSeek primary LLM, Gemini optional fallback).
+- :mod:`core.pixelle.tts` — text-to-speech adapters (Edge-TTS by default).
+- :mod:`core.pixelle.comfy_client` — async client for ComfyUI workflows.
+- :mod:`core.pixelle.llm` — LLM provider abstraction over ``core.llm``.
+
+PR-A1 ships only the building blocks (no Streamlit page yet). The Producer
+page that wires these together will land in PR-A2.
+
+See ``NOTICE`` and ``LICENSE-APACHE`` in this directory for upstream
+attribution.
+"""
+from __future__ import annotations
+
+from core.pixelle.config import (
+    ComfyUIConfig,
+    LLMConfig,
+    PixelleConfig,
+    TTSConfig,
+    load_config,
+)
+from core.pixelle.tts import EdgeTTSAdapter, TTSAdapter, TTSResult, synthesize
+
+__all__ = [
+    "ComfyUIConfig",
+    "EdgeTTSAdapter",
+    "LLMConfig",
+    "PixelleConfig",
+    "TTSAdapter",
+    "TTSConfig",
+    "TTSResult",
+    "load_config",
+    "synthesize",
+]
