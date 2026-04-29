@@ -4,15 +4,23 @@ The :class:`TTSAdapter` protocol is the single seam used by the Producer
 page. Today only Edge-TTS is implemented (free, no key, decent quality).
 IndexTTS / ChatTTS / Kokoro can be added later by implementing the same
 protocol — pages need not change.
+
+The Edge-TTS adapter exposes two flavours:
+
+- :meth:`EdgeTTSAdapter.synthesize` — fire-and-forget, just writes the mp3.
+- :meth:`EdgeTTSAdapter.synthesize_with_timing` — also captures per-word
+  timing (``WordBoundary`` events) so the subtitle module can build SRT
+  without needing a separate alignment pass.
 """
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
 from core.pixelle.config import TTSConfig
+from core.pixelle.subtitles import WordBoundary
 
 
 @dataclass
@@ -23,6 +31,7 @@ class TTSResult:
     duration_seconds: float
     voice: str
     engine: str
+    word_boundaries: list[WordBoundary] = field(default_factory=list)
 
 
 class TTSAdapter(Protocol):
@@ -62,6 +71,31 @@ class EdgeTTSAdapter:
             engine=self.name,
         )
 
+    def synthesize_with_timing(
+        self, text: str, *, output_path: Path, voice: str
+    ) -> TTSResult:
+        """Like :meth:`synthesize` but also captures WordBoundary events.
+
+        Falls back gracefully: if the underlying ``edge-tts`` install
+        doesn't surface boundary events, ``word_boundaries`` is empty and
+        callers should use :func:`subtitles.fallback_captions_from_text`.
+        """
+        if not text.strip():
+            raise ValueError("TTS text must be non-empty")
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        boundaries = asyncio.run(
+            self._run_with_timing(text=text, output_path=output_path, voice=voice)
+        )
+        duration = _probe_mp3_duration(output_path)
+        return TTSResult(
+            audio_path=output_path,
+            duration_seconds=duration,
+            voice=voice,
+            engine=self.name,
+            word_boundaries=boundaries,
+        )
+
     async def _run(self, *, text: str, output_path: Path, voice: str) -> None:
         # Imported lazily so unit tests that monkey-patch the adapter don't
         # require ``edge-tts`` to be installed in CI minimal images.
@@ -74,6 +108,27 @@ class EdgeTTSAdapter:
             volume=self.volume,
         )
         await communicate.save(str(output_path))
+
+    async def _run_with_timing(
+        self, *, text: str, output_path: Path, voice: str
+    ) -> list[WordBoundary]:
+        import edge_tts
+
+        communicate = edge_tts.Communicate(
+            text=text,
+            voice=voice,
+            rate=self.rate,
+            volume=self.volume,
+        )
+        boundaries: list[WordBoundary] = []
+        with output_path.open("wb") as fh:
+            async for chunk in communicate.stream():
+                kind = chunk.get("type")
+                if kind == "audio":
+                    fh.write(chunk.get("data") or b"")
+                elif kind == "WordBoundary":
+                    boundaries.append(WordBoundary.from_edge_tts(chunk))
+        return boundaries
 
 
 def _probe_mp3_duration(path: Path) -> float:

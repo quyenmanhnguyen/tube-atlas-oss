@@ -95,6 +95,14 @@ with r4:
     )
     st.page_link("pages/04_Studio.py", label=t("card_open") + " →")
 
+r5, r6 = st.columns(2, gap="large")
+with r5:
+    st.markdown(
+        _feature_card("05", "🎞️", t("producer_name"), t("producer_sub"), t("producer_desc")),
+        unsafe_allow_html=True,
+    )
+    st.page_link("pages/05_Producer.py", label=t("card_open") + " →")
+
 # ─── API status (compact, footer) ─────────────────────────────────────────────
 st.markdown("&nbsp;")
 s1, s2 = st.columns(2)

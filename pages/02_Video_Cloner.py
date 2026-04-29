@@ -187,6 +187,18 @@ with st.spinner("DeepSeek cloning…"):
             st.error(f"Clone kit failed: {e}")
         st.stop()
 
+# Persist a slim "style kit" so the Producer page (PR-A3) can import the
+# cloned visual style. We deliberately store only fields useful for prompt
+# generation — no transcript, no duplicate of raw kit data.
+st.session_state["cloner_style_kit"] = {
+    "source_title": sn["title"],
+    "source_channel": sn["channelTitle"],
+    "language": out_code,
+    "hook_analysis": kit.get("hook_analysis", ""),
+    "tags": list(kit.get("tags", []) or []),
+    "thumbnail_copy": list(kit.get("thumbnail_copy", []) or []),
+}
+
 # Hook
 st.markdown(kit.get("hook_analysis", ""))
 
