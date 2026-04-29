@@ -1,4 +1,4 @@
-"""Browser Extractor — search YouTube + extract bulk data."""
+﻿"""Browser Extractor — search YouTube + extract bulk data."""
 from __future__ import annotations
 
 import pandas as pd
@@ -60,7 +60,7 @@ if ok and q.strip():
     df = pd.DataFrame(rows)
     st.metric("Tổng video", len(df))
     st.metric("Tổng views", humanize_int(int(df["views"].sum())))
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width='stretch', hide_index=True)
     st.download_button(
         "⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8"), file_name=f"search_{q}.csv"
     )

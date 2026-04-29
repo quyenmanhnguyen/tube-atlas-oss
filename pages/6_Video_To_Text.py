@@ -1,4 +1,4 @@
-"""Video → Text — transcript YouTube."""
+﻿"""Video → Text — transcript YouTube."""
 from __future__ import annotations
 
 import streamlit as st
@@ -37,4 +37,4 @@ if url:
         st.code(srt[:5000])
         st.download_button("⬇️ Tải .srt", srt.encode("utf-8"), file_name=f"{vid}.srt")
     with t3:
-        st.dataframe(segs, use_container_width=True, hide_index=True)
+        st.dataframe(segs, width='stretch', hide_index=True)

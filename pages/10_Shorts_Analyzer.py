@@ -1,4 +1,4 @@
-"""Shorts Analyzer — phân tích YouTube Shorts (<60s) trong search hoặc kênh."""
+﻿"""Shorts Analyzer — phân tích YouTube Shorts (<60s) trong search hoặc kênh."""
 from __future__ import annotations
 
 import pandas as pd
@@ -87,7 +87,7 @@ fig = px.scatter(
     hover_data=["title", "channel"],
     title="Views vs duration (Shorts)",
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
-st.dataframe(df.sort_values("views", ascending=False), hide_index=True, use_container_width=True)
+st.dataframe(df.sort_values("views", ascending=False), hide_index=True, width='stretch')
 st.download_button("⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8"), file_name="shorts.csv")

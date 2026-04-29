@@ -1,4 +1,4 @@
-"""Comment Analyzer — fetch comment + sentiment (VADER nhanh + DeepSeek deep)."""
+﻿"""Comment Analyzer — fetch comment + sentiment (VADER nhanh + DeepSeek deep)."""
 from __future__ import annotations
 
 import json
@@ -63,7 +63,7 @@ if ok and url.strip():
     counts = df["sentiment"].value_counts().reset_index()
     counts.columns = ["sentiment", "count"]
     fig = px.pie(counts, names="sentiment", values="count", title="Phân bố sentiment")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader("Top comment")
     st.dataframe(
@@ -71,7 +71,7 @@ if ok and url.strip():
         .drop(columns=["votes_n"])
         .head(50),
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
     )
 
     if st.button("📋 Tóm tắt audience qua DeepSeek"):

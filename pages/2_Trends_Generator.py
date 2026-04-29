@@ -1,4 +1,4 @@
-"""Trends Generator — pytrends gprop='youtube'."""
+﻿"""Trends Generator — pytrends gprop='youtube'."""
 from __future__ import annotations
 
 import plotly.express as px
@@ -37,8 +37,8 @@ with tabs[0]:
             st.warning("Không có dữ liệu cho keyword/khoảng thời gian này.")
         else:
             fig = px.line(df.reset_index(), x="date", y=keywords, title="Interest over time (YouTube)")
-            st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(df, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
+            st.dataframe(df, width='stretch')
 
 with tabs[1]:
     with st.form("rq"):
@@ -57,14 +57,14 @@ with tabs[1]:
             st.subheader("Top")
             top = data.get("top")
             if top is not None and not top.empty:
-                st.dataframe(top, hide_index=True, use_container_width=True)
+                st.dataframe(top, hide_index=True, width='stretch')
             else:
                 st.info("Không có dữ liệu.")
         with col_rising:
             st.subheader("Rising 🚀")
             rising = data.get("rising")
             if rising is not None and not rising.empty:
-                st.dataframe(rising, hide_index=True, use_container_width=True)
+                st.dataframe(rising, hide_index=True, width='stretch')
             else:
                 st.info("Không có dữ liệu.")
 
@@ -73,4 +73,4 @@ with tabs[2]:
     if st.button("Lấy trending searches"):
         with st.spinner("..."):
             df = trends.trending_searches(pn=pn)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width='stretch')

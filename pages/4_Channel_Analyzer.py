@@ -1,4 +1,4 @@
-"""Channel Analyzer — KPI kênh + top videos + biểu đồ upload."""
+﻿"""Channel Analyzer — KPI kênh + top videos + biểu đồ upload."""
 from __future__ import annotations
 
 import pandas as pd
@@ -77,18 +77,18 @@ if inp:
     by_month = df.groupby(df["publishedAt"].dt.to_period("M")).size().reset_index(name="videos")
     by_month["publishedAt"] = by_month["publishedAt"].astype(str)
     fig = px.bar(by_month, x="publishedAt", y="videos", title="Videos / tháng")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader("🏆 Top 10 video xem nhiều nhất")
     top = df.sort_values("views", ascending=False).head(10)
     st.dataframe(
         top[["title", "views", "likes", "comments", "duration_sec", "publishedAt"]],
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
     )
 
     st.subheader("📋 Tất cả videos")
-    st.dataframe(df, hide_index=True, use_container_width=True)
+    st.dataframe(df, hide_index=True, width='stretch')
     st.download_button(
         "⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8"), file_name=f"{ch['id']}_videos.csv"
     )
