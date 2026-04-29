@@ -1,4 +1,9 @@
-"""Tube Atlas v2 — landing page (IOCO-style hero + 3 research + 2 create cards)."""
+"""Tube Atlas v3 — landing page.
+
+Layout: hero → 4 numbered cards (01 Research · 02 Cloner · 03 Outlier · 04 Studio).
+Niche analysis was merged into 01 Research (it's a deeper view of the same seed,
+not a separate tool).
+"""
 from __future__ import annotations
 
 import os
@@ -65,48 +70,30 @@ st.markdown(
 r1, r2 = st.columns(2, gap="large")
 with r1:
     st.markdown(
-        _feature_card("01", "🧬", t("niche_name"), t("niche_sub"), t("niche_desc")),
+        _feature_card("01", "🔬", t("research_name"), t("research_sub"), t("research_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/01_Niche_Finder.py", label=t("card_open") + " →")
+    st.page_link("pages/01_Research.py", label=t("card_open") + " →")
 with r2:
     st.markdown(
-        _feature_card("02", "🔑", t("kw_name"), t("kw_sub"), t("kw_desc")),
+        _feature_card("02", "▶", t("cloner_name"), t("cloner_sub"), t("cloner_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/02_Keyword_Finder.py", label=t("card_open") + " →")
+    st.page_link("pages/02_Video_Cloner.py", label=t("card_open") + " →")
 
 r3, r4 = st.columns(2, gap="large")
 with r3:
     st.markdown(
-        _feature_card("03", "▶", t("cloner_name"), t("cloner_sub"), t("cloner_desc")),
+        _feature_card("03", "🎯", t("outlier_name"), t("outlier_sub"), t("outlier_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/03_Video_Cloner.py", label=t("card_open") + " →")
+    st.page_link("pages/03_Outlier_Finder.py", label=t("card_open") + " →")
 with r4:
     st.markdown(
-        _feature_card("04", "🎯", t("outlier_name"), t("outlier_sub"), t("outlier_desc")),
+        _feature_card("04", "🎬", t("studio_name"), t("studio_sub"), t("studio_desc")),
         unsafe_allow_html=True,
     )
-    st.page_link("pages/04_Outlier_Finder.py", label=t("card_open") + " →")
-
-# ─── Section · Create ─────────────────────────────────────────────────────────
-st.markdown(
-    f"""
-    <div style="margin-top: 38px; margin-bottom: 18px;">
-        <div class="eyebrow" style="color:#a78bfa;">— {t("section_create")}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-c1, _s1 = st.columns([1, 1], gap="large")
-with c1:
-    st.markdown(
-        _feature_card("05", "🎬", t("studio_name"), t("studio_sub"), t("studio_desc")),
-        unsafe_allow_html=True,
-    )
-    st.page_link("pages/05_Studio.py", label=t("card_open") + " →")
+    st.page_link("pages/04_Studio.py", label=t("card_open") + " →")
 
 # ─── API status (compact, footer) ─────────────────────────────────────────────
 st.markdown("&nbsp;")

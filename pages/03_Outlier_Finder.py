@@ -22,16 +22,16 @@ inject()
 language_selector()
 
 page_header(
-    eyebrow="04 · " + t("section_research"),
+    eyebrow="03 · " + t("section_research"),
     title="🎯  " + t("outlier_name"),
     subtitle=t("outlier_desc"),
 )
 
 # Cross-page handoffs (consumed once).
 if st.session_state.pop("_goto_studio", False):
-    st.switch_page("pages/05_Studio.py")
+    st.switch_page("pages/04_Studio.py")
 if st.session_state.pop("_goto_cloner", False):
-    st.switch_page("pages/03_Video_Cloner.py")
+    st.switch_page("pages/02_Video_Cloner.py")
 
 
 def _send_topic_to_studio(value: str) -> None:

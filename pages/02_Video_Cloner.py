@@ -24,13 +24,13 @@ inject()
 language_selector()
 
 page_header(
-    eyebrow="03 · " + t("section_research"),
+    eyebrow="02 · " + t("section_research"),
     title="▶  " + t("cloner_name"),
     subtitle=t("cloner_desc"),
 )
 
 if st.session_state.pop("_goto_studio", False):
-    st.switch_page("pages/05_Studio.py")
+    st.switch_page("pages/04_Studio.py")
 
 # Outlier Finder hands off the video URL via cloner_url_in.
 _url_prefill = st.session_state.pop("cloner_url_in", "")

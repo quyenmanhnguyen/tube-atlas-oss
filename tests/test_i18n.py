@@ -55,3 +55,18 @@ def test_pulse_and_kw_score_strings_present():
         "kw_vph_top",
     ]:
         assert key in i18n.STRINGS, f"missing key {key}"
+
+
+def test_research_page_strings_present():
+    """01 Research is the merged Keyword + Niche page; all 4 langs required."""
+    for key in [
+        "research_name", "research_sub", "research_desc",
+        "research_seed", "research_region", "research_lang", "research_run",
+        "research_tab_keywords", "research_tab_niche",
+        "research_loading_autocomplete", "research_no_suggestions",
+        "niche_trend_signal", "niche_metrics", "niche_top_channels",
+        "niche_audience_pulse", "niche_ai_verdict", "niche_no_trend_data",
+    ]:
+        assert key in i18n.STRINGS, f"missing key {key}"
+        for lang in ("en", "ko", "ja", "vi"):
+            assert lang in i18n.STRINGS[key], f"{key} missing {lang}"
