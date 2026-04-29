@@ -12,3 +12,4 @@ openai>=1.40
 vaderSentiment>=3.3.2
 wordcloud>=1.9
 matplotlib>=3.9
+langdetect>=1.0.9

@@ -2,7 +2,7 @@
 
 # 📺 Tube Atlas OSS
 
-**Bộ công cụ nghiên cứu YouTube mã nguồn mở — thay thế Tube Atlas Premium / VidIQ / TubeBuddy**
+**Focused YouTube research & creator toolkit — find a niche, mine keywords, clone winning videos, ship scripts in EN/KO/JA/VI.**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
@@ -11,7 +11,7 @@
 [![CI](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/quyenmanhnguyen/tube-atlas-oss/actions)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-docker)
 
-<img src="https://img.shields.io/badge/Tools-10%20features-7c3aed?style=for-the-badge" alt="10 features">
+<img src="https://img.shields.io/badge/Tools-5%20focused%20features-7c3aed?style=for-the-badge" alt="5 focused features">
 
 </div>
 
@@ -34,22 +34,48 @@
 
 ---
 
-## ✨ Tính năng
+## ✨ Features
 
-| # | Tool | Mô tả | Cần API key? |
+Five focused tools, wired together as a **single seamless pipeline**: discover a niche, mine keywords, hunt outlier videos, clone winners → drop any of it into Studio → walk it through Topic → Title → Outline → Script → Humanize Rewrite. No copy-pasting between tools.
+
+### Research
+
+| # | Tool | What it does | API keys |
 |---|---|---|---|
-| 🔑 | **Keyword Generator** | Long-tail keywords từ YouTube Autocomplete | ❌ Free |
-| 📈 | **Trends Generator** | Google Trends cho YouTube + related queries | ❌ Free |
-| 🎬 | **Video Analyzer** | Stats, engagement, tags chi tiết | ✅ YouTube |
-| 📊 | **Channel Analyzer** | KPI kênh, upload frequency, top videos | ✅ YouTube |
-| ✨ | **Title Generator** | Gợi ý title CTR cao bằng AI | ✅ DeepSeek |
-| 📝 | **Video → Text** | Transcript / phụ đề từ YouTube | ❌ Free |
-| 🌀 | **Content Spinner** | Spin / rewrite nội dung bằng AI | ✅ DeepSeek |
-| 🕸️ | **Browser Extractor** | Search + scrape data bulk | ✅ YouTube |
-| 💬 | **Comment Analyzer** | Sentiment analysis + audience insight | ❌ Free* |
-| 🩳 | **Shorts Analyzer** | Phân tích YouTube Shorts & trends | ✅ YouTube |
+| 01 | **Niche Finder** | Trends + long-tail + top channels + **outlier (breakout) detection** + **opportunity score** + **Trend Pulse 7d** (HOT / cooling / stable) + audience sentiment + AI verdict. | YouTube + DeepSeek |
+| 02 | **Keyword Finder** | Long-tail suggestions from YouTube Autocomplete + **VidIQ-style Keyword Score** (Volume + Competition gauges, proxy) + **VPH bar chart** of top results + **KGR ease-to-rank** + **question buckets** (`how/what/why/when/where`). | None / YouTube |
+| 03 | **Video Cloner** | Paste a URL → fingerprint, hook/structure breakdown, N title clones, full script clone, thumbnail copy & SEO tags — **auto-detects the source video's language**. Transcript backend uses ``youtube-transcript-api`` with **yt-dlp fallback** for cloud-IP environments. | YouTube + DeepSeek |
+| 04 | **Outlier Finder** ⭐ | Find **small channels with viral videos** in the last 7/14/30 days. Filters by ``subs ≤ N`` and ``views/subs ≥ K×``. Per-row **🎯 Clone** + **📝 Studio topic** handoff. CSV export. | YouTube |
 
-> **6/10 tools hoạt động ngay** mà không cần API key nào!
+### Create
+
+| # | Tool | What it does | API keys |
+|---|---|---|---|
+| 05 | **Studio** | 5-step wizard: ① 20 topic ideas → ② 10 titles (top 3 CTR marked) → ③ 8-part long-form outline (Hook · Empathy · Problem 1 · Small Change · Story · Problems 2&3 · Reflection · CTA) → ④ full long-form script (chunked, up to 24,000 chars) → ⑤ humanize rewrite. State persists across steps; Niche / Keyword / Cloner / Outlier all prefill any step via **"→ Send to Studio"**. | DeepSeek |
+
+UI and AI output respect the language picker (English / 한국어 / 日本語 / Tiếng Việt) in the sidebar — and Video Cloner overrides it with the source video's detected language unless you force otherwise.
+
+### Pipeline diagram
+
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ 01 Niche    │  │ 02 Keyword  │  │ 03 Cloner   │  │ 04 Outlier  │
+│ • Pulse 7d  │  │ • Vol/Comp  │  │ • lang det  │  │ • subs≤100k │
+│ • outliers  │  │ • VPH chart │  │ • clone kit │  │ • views/sub │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │                │
+       └─── → Send to Studio  ·  → Clone via Cloner  ─────┘
+                              │
+                              ▼
+                ┌──────────────────────────────┐
+                │     05 Studio (5 steps)      │
+                │ ① Topic ideas (×20)          │
+                │ ② Titles (×10 + top-3 CTR)   │
+                │ ③ 8-part outline             │
+                │ ④ Long-form script (chunked) │
+                │ ⑤ Humanize rewrite           │
+                └──────────────────────────────┘
+```
 
 ---
 
@@ -156,18 +182,22 @@ tube-atlas-oss/
 ├── core/
 │   ├── autocomplete.py   # YouTube keyword suggestions
 │   ├── comments.py       # Comment downloader (no API key)
-│   ├── llm.py            # DeepSeek integration
-│   ├── theme.py          # Premium CSS module
+│   ├── i18n.py           # EN/KO/JA/VI strings + language selector
+│   ├── keywords.py       # KGR-style score + question buckets
+│   ├── lang_detect.py    # Detect transcript language → LangCode
+│   ├── llm.py            # DeepSeek integration + Studio pipeline helpers
+│   ├── theme.py          # Shared CSS + page_header helper
 │   ├── transcript.py     # YouTube transcript (no API key)
 │   ├── trends.py         # pytrends YouTube
 │   ├── utils.py          # Helpers
-│   └── youtube.py        # YouTube Data API v3 wrapper
-├── pages/                # 10 Streamlit pages
-│   ├── 1_Keyword_Generator.py
-│   ├── 2_Trends_Generator.py
-│   ├── ...
-│   └── 10_Shorts_Analyzer.py
-├── assets/               # Screenshots
+│   └── youtube.py        # YouTube Data API v3 + outliers + opportunity score
+├── pages/
+│   ├── 01_Niche_Finder.py    # opportunity score + breakouts + AI verdict
+│   ├── 02_Keyword_Finder.py  # KGR score + question buckets + Send-to-Studio
+│   ├── 03_Video_Cloner.py    # auto-language detect + clone kit
+│   └── 04_Studio.py          # 5-step wizard (Topic→Title→Outline→Script→Rewrite)
+├── tests/                # pytest unit tests
+├── assets/
 └── requirements.txt
 ```
 
