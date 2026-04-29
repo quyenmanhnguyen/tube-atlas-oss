@@ -163,6 +163,18 @@ STRINGS: dict[str, dict[LangCode, str]] = {
     "producer_scene_count":      {"en": "{n} scene prompts",          "ko": "씬 프롬프트 {n}개",     "ja": "シーンプロンプト {n} 件",   "vi": "{n} scene prompts"},
     "producer_download_prompts": {"en": "⬇ Download prompts (.json)", "ko": "⬇ 프롬프트 다운로드(.json)", "ja": "⬇ プロンプトをダウンロード (.json)", "vi": "⬇ Tải prompts (.json)"},
 
+    # 05 Producer · ComfyUI provider (PR-A3.1)
+    "producer_comfy_settings":   {"en": "ComfyUI settings",            "ko": "ComfyUI 설정",          "ja": "ComfyUI 設定",              "vi": "Cài đặt ComfyUI"},
+    "producer_comfy_url":        {"en": "ComfyUI base URL",            "ko": "ComfyUI 주소",          "ja": "ComfyUI URL",               "vi": "URL ComfyUI"},
+    "producer_comfy_workflow":   {"en": "Workflow JSON path (blank = bundled default)", "ko": "워크플로우 JSON 경로(빈칸=기본)", "ja": "ワークフローJSONパス(空=バンドル)", "vi": "Đường dẫn workflow JSON (trống = mặc định)"},
+    "producer_comfy_checkpoint": {"en": "Checkpoint (.safetensors)",   "ko": "체크포인트(.safetensors)", "ja": "チェックポイント(.safetensors)", "vi": "Checkpoint (.safetensors)"},
+    "producer_comfy_seed":       {"en": "Seed (blank = random per scene)", "ko": "시드(빈칸=씬마다 랜덤)", "ja": "シード(空=シーンごとランダム)", "vi": "Seed (trống = random từng scene)"},
+    "producer_comfy_probing":    {"en": "Probing ComfyUI at {url}…",   "ko": "ComfyUI 확인 중 ({url})…", "ja": "ComfyUI 確認中 ({url})…", "vi": "Đang kiểm tra ComfyUI ({url})…"},
+    "producer_comfy_down":       {"en": "ComfyUI not reachable at {url} — falling back to gradient placeholder.", "ko": "{url} 의 ComfyUI 에 연결할 수 없음 — 그라디언트 플레이스홀더로 대체.", "ja": "{url} の ComfyUI に接続できません — グラデーションにフォールバックします。", "vi": "Không kết nối được ComfyUI tại {url} — fallback gradient."},
+    "producer_comfy_scene_step": {"en": "ComfyUI scene {i}/{n}…",       "ko": "ComfyUI 씬 {i}/{n}…",  "ja": "ComfyUI シーン {i}/{n}…",  "vi": "ComfyUI scene {i}/{n}…"},
+    "producer_comfy_scene_fail": {"en": "Scene {i} generation failed — falling back to gradient ({reason}).", "ko": "씬 {i} 생성 실패 — 그라디언트로 대체 ({reason}).", "ja": "シーン {i} の生成に失敗 — グラデーションにフォールバック ({reason})。", "vi": "Scene {i} tạo lỗi — fallback gradient ({reason})."},
+    "producer_comfy_using":      {"en": "Using ComfyUI scene images ({n} scenes).", "ko": "ComfyUI 씬 이미지 사용 ({n} 씬).", "ja": "ComfyUI のシーン画像を使用 ({n} シーン)。", "vi": "Đang dùng ảnh scene từ ComfyUI ({n} scenes)."},
+
     "lang_label":       {"en": "Language",         "ko": "언어",           "ja": "言語",                   "vi": "Ngôn ngữ"},
     "api_yt":           {"en": "YouTube API",      "ko": "YouTube API",    "ja": "YouTube API",            "vi": "YouTube API"},
     "api_ds":           {"en": "DeepSeek AI",      "ko": "DeepSeek AI",    "ja": "DeepSeek AI",            "vi": "DeepSeek AI"},

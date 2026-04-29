@@ -57,6 +57,21 @@ class ComposerOptions:
     caption_bottom_margin: int = 220
 
 
+@dataclass(frozen=True)
+class SceneAsset:
+    """One pre-rendered scene background — typically from an AI provider.
+
+    Used by :func:`make_short` to switch from a single gradient
+    background to a sequence of per-scene images, each Ken-Burns'd
+    independently. Times are in seconds, relative to the start of the
+    audio track.
+    """
+
+    image_path: Path
+    start_s: float
+    duration_s: float
+
+
 def make_short(
     audio_path: Path,
     output_path: Path,
@@ -64,6 +79,7 @@ def make_short(
     captions: list[Caption] | None = None,
     duration_hint: float | None = None,
     options: ComposerOptions | None = None,
+    scene_assets: list[SceneAsset] | None = None,
 ) -> Path:
     """Compose audio + placeholder background + captions into an mp4.
 
@@ -106,17 +122,28 @@ def make_short(
         )
 
     style = get_style(opts.style)
-    bg_image_path = output_path.with_suffix(".bg.png")
-    _render_gradient_background(bg_image_path, opts.width, opts.height, style)
+    cleanup_paths: list[Path] = []
+    layers: list = []
 
-    bg_clip = (
-        ImageClip(str(bg_image_path))
-        .set_duration(duration)
-        .resize(_ken_burns_factory(duration))
-        .set_position(("center", "center"))
-    )
+    if scene_assets:
+        layers.extend(
+            _scene_clips(
+                scene_assets,
+                opts=opts,
+                total_duration=duration,
+            )
+        )
+    else:
+        bg_image_path = output_path.with_suffix(".bg.png")
+        _render_gradient_background(bg_image_path, opts.width, opts.height, style)
+        cleanup_paths.append(bg_image_path)
+        layers.append(
+            ImageClip(str(bg_image_path))
+            .set_duration(duration)
+            .resize(_ken_burns_factory(duration))
+            .set_position(("center", "center"))
+        )
 
-    layers: list = [bg_clip]
     if captions:
         layers.extend(_caption_clips(captions, opts=opts, style=style))
 
@@ -136,7 +163,8 @@ def make_short(
 
     final.close()
     audio.close()
-    bg_image_path.unlink(missing_ok=True)
+    for path in cleanup_paths:
+        path.unlink(missing_ok=True)
     return output_path
 
 
@@ -178,6 +206,41 @@ def _render_gradient_background(path: Path, width: int, height: int, style: Styl
     overlay = overlay.filter(ImageFilter.GaussianBlur(radius=80))
     out = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
     out.save(path, "PNG")
+
+
+def _scene_clips(
+    assets: list[SceneAsset],
+    *,
+    opts: ComposerOptions,
+    total_duration: float,
+) -> list:
+    """Turn a list of :class:`SceneAsset` into Ken-Burns'd ImageClips.
+
+    Each asset's image is loaded once, resized to cover the canvas
+    (preserving aspect ratio), then animated with the same slow zoom
+    used by the gradient path. We trust the caller to set ``start_s``
+    and ``duration_s`` so the assets cover the audio track without
+    overlap; any tail past ``total_duration`` is clamped.
+    """
+    from moviepy.editor import ImageClip
+
+    clips = []
+    for asset in assets:
+        if asset.duration_s <= 0:
+            continue
+        start = max(0.0, float(asset.start_s))
+        end = min(total_duration, start + float(asset.duration_s))
+        clip_duration = max(0.05, end - start)
+        clip = (
+            ImageClip(str(asset.image_path))
+            .set_start(start)
+            .set_duration(clip_duration)
+            .resize(height=opts.height)
+            .resize(_ken_burns_factory(clip_duration))
+            .set_position(("center", "center"))
+        )
+        clips.append(clip)
+    return clips
 
 
 def _ken_burns_factory(duration: float):

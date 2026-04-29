@@ -149,3 +149,79 @@ def test_provider_missing_reason_nonempty_when_not_configured(
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     p = GeminiImageProvider()
     assert p.missing_reason()  # non-empty hint
+
+
+# ─── PR-A3.1: ComfyUI provider real-wiring tests ─────────────────────────────
+
+
+def test_comfyui_generate_image_delegates_to_orchestrator(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """``ComfyUIVisualProvider.generate_image`` should call
+    :func:`core.pixelle.comfyui_image.generate_scene_image` with the
+    base URL from config + the user-supplied workflow / checkpoint /
+    seed knobs, and return its result.
+    """
+    from core.pixelle import comfyui_image
+
+    captured: dict = {}
+    expected_path = tmp_path / "scene.png"
+
+    def _fake_generate(prompt, **kwargs):
+        captured["prompt"] = prompt
+        captured["kwargs"] = kwargs
+        # Simulate the real orchestrator writing the file.
+        kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
+        kwargs["output_path"].write_bytes(b"fake-png")
+        return kwargs["output_path"]
+
+    monkeypatch.setattr(comfyui_image, "generate_scene_image", _fake_generate)
+
+    workflow = tmp_path / "wf.json"
+    workflow.write_text("{}")  # not actually loaded by the fake
+
+    p = ComfyUIVisualProvider(
+        workflow_path=workflow,
+        checkpoint="my-ckpt.safetensors",
+        seed=42,
+    )
+
+    out = p.generate_image(_scene(), output_path=expected_path)
+    assert out == expected_path
+    assert captured["kwargs"]["workflow_path"] == workflow
+    assert captured["kwargs"]["checkpoint"] == "my-ckpt.safetensors"
+    assert captured["kwargs"]["seed"] == 42
+    # base_url comes from config, not user-supplied here
+    assert captured["kwargs"]["base_url"].startswith("http")
+
+
+def test_comfyui_generate_image_translates_error_to_placeholder_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Any :class:`ComfyUIError` from the orchestrator should be wrapped
+    in :class:`UsePlaceholderFallback` so the Producer page can recover.
+    """
+    from core.pixelle import comfyui_image
+    from core.pixelle.comfy_client import ComfyUIError
+
+    def _boom(prompt, **kwargs):
+        raise ComfyUIError("server down")
+
+    monkeypatch.setattr(comfyui_image, "generate_scene_image", _boom)
+
+    p = ComfyUIVisualProvider()
+    with pytest.raises(UsePlaceholderFallback) as exc_info:
+        p.generate_image(_scene(), output_path=tmp_path / "x.png")
+    # Original error should be chained for debuggability.
+    assert isinstance(exc_info.value.__cause__, ComfyUIError)
+
+
+def test_comfyui_generate_image_raises_not_configured_when_no_url(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setenv("COMFYUI_URL", "")
+    monkeypatch.delenv("RUNNINGHUB_API_KEY", raising=False)
+    p = ComfyUIVisualProvider()
+    assert not p.is_configured()
+    with pytest.raises(ProviderNotConfiguredError):
+        p.generate_image(_scene(), output_path=tmp_path / "x.png")

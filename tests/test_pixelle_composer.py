@@ -188,6 +188,148 @@ def test_pil_to_array_returns_correct_shape(tmp_path):
     assert arr.shape == (6, 10, 4)  # numpy convention is (h, w, channels)
 
 
+# ─── PR-A3.1: scene_assets path (per-scene Ken Burns) ────────────────────────
+
+
+def test_scene_clips_creates_one_clip_per_asset(monkeypatch, tmp_path):
+    """``_scene_clips`` should produce exactly one ImageClip per
+    :class:`SceneAsset`, with the correct start / duration / position.
+    """
+    fake_clip = MagicMock()
+    for method in ("set_start", "set_duration", "set_position", "resize"):
+        getattr(fake_clip, method).return_value = fake_clip
+
+    fake_image_clip = MagicMock(return_value=fake_clip)
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.ImageClip = fake_image_clip
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    img1 = tmp_path / "scene_01.png"
+    img1.write_bytes(b"x")
+    img2 = tmp_path / "scene_02.png"
+    img2.write_bytes(b"y")
+    assets = [
+        composer.SceneAsset(image_path=img1, start_s=0.0, duration_s=4.0),
+        composer.SceneAsset(image_path=img2, start_s=4.0, duration_s=3.0),
+    ]
+
+    clips = composer._scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=7.0
+    )
+
+    assert len(clips) == 2
+    # Two ImageClip(...) calls, one per asset.
+    assert fake_image_clip.call_count == 2
+    # Start times match the asset definitions.
+    starts = [call.args[0] for call in fake_clip.set_start.call_args_list]
+    assert starts == [0.0, 4.0]
+    durations = [call.args[0] for call in fake_clip.set_duration.call_args_list]
+    assert durations == [4.0, 3.0]
+
+
+def test_scene_clips_clamps_overflow_to_total_duration(monkeypatch, tmp_path):
+    """If an asset's start+duration exceeds ``total_duration``, the
+    clip's effective duration is clamped — never negative.
+    """
+    fake_clip = MagicMock()
+    for method in ("set_start", "set_duration", "set_position", "resize"):
+        getattr(fake_clip, method).return_value = fake_clip
+
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.ImageClip = MagicMock(return_value=fake_clip)
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    img = tmp_path / "scene.png"
+    img.write_bytes(b"x")
+    assets = [composer.SceneAsset(image_path=img, start_s=4.0, duration_s=10.0)]
+
+    composer._scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=5.0
+    )
+    # Effective duration should be clamped to (5.0 - 4.0) = 1.0.
+    duration_arg = fake_clip.set_duration.call_args_list[0].args[0]
+    assert duration_arg == pytest.approx(1.0)
+
+
+def test_scene_clips_skips_zero_duration(monkeypatch, tmp_path):
+    fake_clip = MagicMock()
+    for method in ("set_start", "set_duration", "set_position", "resize"):
+        getattr(fake_clip, method).return_value = fake_clip
+
+    fake_image_clip = MagicMock(return_value=fake_clip)
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.ImageClip = fake_image_clip
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    img = tmp_path / "scene.png"
+    img.write_bytes(b"x")
+    assets = [composer.SceneAsset(image_path=img, start_s=0.0, duration_s=0.0)]
+    clips = composer._scene_clips(
+        assets, opts=composer.ComposerOptions(), total_duration=5.0
+    )
+    assert clips == []
+    fake_image_clip.assert_not_called()
+
+
+def test_make_short_with_scene_assets_uses_scene_clips_not_gradient(
+    tmp_path, monkeypatch
+):
+    """When ``scene_assets`` is provided, ``make_short`` must NOT
+    render the gradient PNG and must NOT clean up a non-existent
+    ``.bg.png``. ImageClip should be called once per scene.
+    """
+    audio = tmp_path / "v.mp3"
+    audio.write_bytes(b"fake-mp3")
+    out = tmp_path / "out.mp4"
+
+    fake_audio = MagicMock()
+    fake_audio.duration = 6.0
+    fake_audio.close = MagicMock()
+
+    fake_clip = MagicMock()
+    for method in ("set_start", "set_duration", "set_position", "resize"):
+        getattr(fake_clip, method).return_value = fake_clip
+
+    fake_image_clip = MagicMock(return_value=fake_clip)
+
+    fake_composite = MagicMock()
+    fake_composite.set_duration.return_value = fake_composite
+    fake_composite.set_audio.return_value = fake_composite
+    fake_composite.write_videofile = MagicMock()
+    fake_composite.close = MagicMock()
+
+    fake_module = types.ModuleType("moviepy.editor")
+    fake_module.AudioFileClip = MagicMock(return_value=fake_audio)
+    fake_module.ImageClip = fake_image_clip
+    fake_module.CompositeVideoClip = MagicMock(return_value=fake_composite)
+    monkeypatch.setitem(sys.modules, "moviepy.editor", fake_module)
+
+    # Spy on gradient render to confirm it is NOT called when scene_assets are present.
+    gradient_calls = {"n": 0}
+
+    def _spy(*a, **kw):
+        gradient_calls["n"] += 1
+
+    monkeypatch.setattr(composer, "_render_gradient_background", _spy)
+
+    img1 = tmp_path / "scene_01.png"
+    img1.write_bytes(b"x")
+    img2 = tmp_path / "scene_02.png"
+    img2.write_bytes(b"y")
+    assets = [
+        composer.SceneAsset(image_path=img1, start_s=0.0, duration_s=3.0),
+        composer.SceneAsset(image_path=img2, start_s=3.0, duration_s=3.0),
+    ]
+
+    composer.make_short(audio, out, scene_assets=assets, captions=None)
+
+    assert gradient_calls["n"] == 0
+    # Two ImageClip calls — one per scene asset, no gradient.
+    assert fake_image_clip.call_count == 2
+    # No bg.png was created, so cleanup is a no-op.
+    assert not out.with_suffix(".bg.png").exists()
+
+
 # ─── Path overlap test for caption layout (math, not rendering) ─────────────
 def test_caption_clips_position_and_timing_math(monkeypatch):
     """Verify start/duration/y-offset are correctly applied to each caption clip."""
