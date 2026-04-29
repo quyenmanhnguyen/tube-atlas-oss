@@ -337,17 +337,16 @@ class GrokImageProvider(VisualProvider):
 
     info = ProviderInfo(
         name="grok_image",
-        label="Grok / xAI image + video (Aurora · Veo 3)",
-        kind="image+video",
+        label="Grok / xAI image (Aurora)",
+        kind="image",
         requires=["Grok account login (email + password)"],
         notes=(
-            "Drives grok.com's web image and video endpoints after a "
-            "Playwright auto-login. Sign in once with your grok.com "
-            "email and password in the credential dialog above; the "
-            "session lives in memory only. Image generation falls back "
-            "to the gradient placeholder on session expiry or "
-            "moderation. Video generation produces 6 / 10 second MP4 "
-            "clips at 480p / 720p (Veo 3)."
+            "Drives grok.com's web image endpoint after a Playwright "
+            "auto-login. Sign in once with your grok.com email and "
+            "password in the credential dialog above; the session "
+            "lives in memory only. Falls back to the gradient "
+            "placeholder if the session expires or moderation blocks "
+            "every candidate."
         ),
     )
 
@@ -356,16 +355,12 @@ class GrokImageProvider(VisualProvider):
         *,
         session: "object | None" = None,
         aspect_ratio: str = "9:16",
-        video_length: int = 6,
-        resolution: str = "720p",
     ) -> None:
         # ``session`` is typed as ``object`` here to avoid an import
         # cycle on grok_web_client at registry-construction time. The
         # method bodies do a lazy import + isinstance check.
         self._session = session
         self._aspect_ratio = aspect_ratio
-        self._video_length = video_length
-        self._resolution = resolution
 
     def is_configured(self) -> bool:
         return self._session is not None
@@ -416,52 +411,12 @@ class GrokImageProvider(VisualProvider):
         return output_path
 
     def generate_video(self, prompt: ScenePrompt, *, output_path: Path) -> Path | None:
-        """Generate a short MP4 clip via grok.com's Veo 3 endpoint.
-
-        Reuses the same :class:`GrokSession` as
-        :meth:`generate_image`. Errors (expired session, moderation
-        blocking every candidate, network failures) are translated to
-        :class:`UsePlaceholderFallback` so the Producer page can roll
-        the entire pipeline back to the gradient + Ken Burns flow.
-
-        ``prompt.video_prompt`` is the long-form 3–4 sentence scene
-        description from PR-A4.1 — Grok / Veo handle it well; the
-        shorter ``image_prompt`` is a fallback for callers that only
-        carry the still-image string.
-        """
+        # Video wiring lands in PR-A5.
         if self._session is None:
             raise ProviderNotConfiguredError(self.missing_reason())
-
-        # Lazy import — keeps ``import core.pixelle`` cheap and lets
-        # tests stub the client module out without provoking an
-        # import-time HTTP setup.
-        from core.pixelle.grok_video_client import generate_video_via_web
-        from core.pixelle.grok_web_client import GrokSession, GrokWebError
-
-        if not isinstance(self._session, GrokSession):
-            raise ProviderNotConfiguredError(
-                "GrokImageProvider session is not a GrokSession instance."
-            )
-
-        text = (prompt.video_prompt or prompt.image_prompt or "").strip()
-        if not text:
-            raise UsePlaceholderFallback(
-                "Empty prompt → falling back to placeholder."
-            )
-
-        try:
-            return generate_video_via_web(
-                text,
-                self._session,
-                aspect_ratio=self._aspect_ratio,
-                video_length=self._video_length,
-                resolution=self._resolution,
-                output_path=Path(output_path),
-            )
-        except GrokWebError as exc:
-            raise UsePlaceholderFallback(
-                f"Grok video generation failed → falling back to placeholder: {exc}"
-            ) from exc
+        raise ProviderNotImplementedError(
+            f"{self.info.label}: video API integration is not wired yet."
+        )
 
 
 # ─── Registry helpers ────────────────────────────────────────────────────────

@@ -332,135 +332,14 @@ def test_grok_generate_image_passes_aspect_ratio(
     assert captured["aspect_ratio"] == "16:9"
 
 
+def test_grok_generate_video_raises_not_implemented(tmp_path: Path):
+    """Video wiring lands in PR-A5; PR-A4.2 keeps the stub behaviour."""
+    p = GrokImageProvider(session=_grok_session())
+    with pytest.raises(ProviderNotImplementedError):
+        p.generate_video(_scene(), output_path=tmp_path / "x.mp4")
+
+
 def test_grok_generate_video_raises_not_configured_without_session(tmp_path: Path):
     p = GrokImageProvider()  # no session
     with pytest.raises(ProviderNotConfiguredError):
         p.generate_video(_scene(), output_path=tmp_path / "x.mp4")
-
-
-# ─── PR-A5: Grok video provider real-wiring tests ───────────────────────────
-
-
-def test_grok_generate_video_returns_path(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    """Happy path: provider delegates to ``generate_video_via_web`` and
-    returns the same ``output_path`` it received.
-    """
-    from core.pixelle import grok_video_client as gvc
-
-    captured: dict = {}
-
-    def _fake_generate(prompt, session, *, output_path, **kwargs):
-        captured["prompt"] = prompt
-        captured["session"] = session
-        captured["kwargs"] = kwargs
-        # Simulate the real client writing to disk.
-        Path(output_path).write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
-        return Path(output_path)
-
-    monkeypatch.setattr(gvc, "generate_video_via_web", _fake_generate)
-
-    p = GrokImageProvider(session=_grok_session())
-    out = p.generate_video(_scene(), output_path=tmp_path / "scene.mp4")
-    assert out == tmp_path / "scene.mp4"
-    assert (tmp_path / "scene.mp4").exists()
-    # Default aspect_ratio / video_length / resolution flow through.
-    assert captured["kwargs"]["aspect_ratio"] == "9:16"
-    assert captured["kwargs"]["video_length"] == 6
-    assert captured["kwargs"]["resolution"] == "720p"
-    # video_prompt is preferred over image_prompt.
-    assert captured["prompt"] == "vid"
-
-
-def test_grok_generate_video_passes_video_knobs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    from core.pixelle import grok_video_client as gvc
-
-    captured: dict = {}
-
-    def _spy(prompt, session, *, output_path, **kwargs):
-        captured.update(kwargs)
-        Path(output_path).write_bytes(b"X" * 2048)
-        return Path(output_path)
-
-    monkeypatch.setattr(gvc, "generate_video_via_web", _spy)
-
-    p = GrokImageProvider(
-        session=_grok_session(),
-        aspect_ratio="16:9",
-        video_length=10,
-        resolution="480p",
-    )
-    p.generate_video(_scene(), output_path=tmp_path / "x.mp4")
-    assert captured["aspect_ratio"] == "16:9"
-    assert captured["video_length"] == 10
-    assert captured["resolution"] == "480p"
-
-
-def test_grok_generate_video_translates_error_to_placeholder_fallback(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    """A :class:`GrokWebError` from the client should be wrapped in
-    :class:`UsePlaceholderFallback` so the Producer page can recover.
-    """
-    from core.pixelle import grok_video_client as gvc
-    from core.pixelle import grok_web_client as gwc
-
-    def _boom(prompt, session, *, output_path, **kwargs):
-        raise gwc.GrokWebError("moderation blocked all candidates")
-
-    monkeypatch.setattr(gvc, "generate_video_via_web", _boom)
-
-    p = GrokImageProvider(session=_grok_session())
-    with pytest.raises(UsePlaceholderFallback) as exc_info:
-        p.generate_video(_scene(), output_path=tmp_path / "x.mp4")
-    assert isinstance(exc_info.value.__cause__, gwc.GrokWebError)
-
-
-def test_grok_generate_video_empty_prompt_falls_back(tmp_path: Path):
-    """Both ``video_prompt`` and ``image_prompt`` blank → fallback."""
-    p = GrokImageProvider(session=_grok_session())
-    empty_scene = ScenePrompt(
-        scene_id=1,
-        duration=4.0,
-        narration="hi",
-        image_prompt="",
-        video_prompt="",
-    )
-    with pytest.raises(UsePlaceholderFallback):
-        p.generate_video(empty_scene, output_path=tmp_path / "x.mp4")
-
-
-def test_grok_generate_video_falls_back_to_image_prompt_when_video_blank(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    """If ``video_prompt`` is empty, ``image_prompt`` is used."""
-    from core.pixelle import grok_video_client as gvc
-
-    captured: dict = {}
-
-    def _spy(prompt, session, *, output_path, **kwargs):
-        captured["prompt"] = prompt
-        Path(output_path).write_bytes(b"X" * 2048)
-        return Path(output_path)
-
-    monkeypatch.setattr(gvc, "generate_video_via_web", _spy)
-
-    p = GrokImageProvider(session=_grok_session())
-    scene = ScenePrompt(
-        scene_id=1,
-        duration=4.0,
-        narration="hi",
-        image_prompt="img-only",
-        video_prompt="",
-    )
-    p.generate_video(scene, output_path=tmp_path / "x.mp4")
-    assert captured["prompt"] == "img-only"
-
-
-def test_grok_generate_video_kind_advertises_image_plus_video():
-    """Provider info should advertise video support after PR-A5."""
-    info = GrokImageProvider.info
-    assert info.kind == "image+video"
