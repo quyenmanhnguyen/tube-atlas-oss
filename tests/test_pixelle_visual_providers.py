@@ -113,18 +113,28 @@ def test_stub_provider_with_config_raises_not_implemented(
         p.generate_image(_scene(), output_path=tmp_path / "x.png")
 
 
-def test_grok_provider_reads_xai_api_key(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("XAI_API_KEY", raising=False)
-    monkeypatch.delenv("GROK_API_KEY", raising=False)
-    assert not GrokImageProvider().is_configured()
-    monkeypatch.setenv("XAI_API_KEY", "sk-test")
-    assert GrokImageProvider().is_configured()
+def test_grok_provider_unconfigured_without_session():
+    """PR-A4.2: provider is not configured until a session is injected."""
+    assert GrokImageProvider().is_configured() is False
+    assert GrokImageProvider().missing_reason()
 
 
-def test_grok_provider_reads_grok_api_key_alias(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("XAI_API_KEY", raising=False)
-    monkeypatch.setenv("GROK_API_KEY", "sk-test")
-    assert GrokImageProvider().is_configured()
+def test_grok_provider_configured_with_session():
+    """A :class:`GrokSession` instance flips ``is_configured``."""
+    from core.pixelle.grok_web_client import GrokSession
+
+    sess = GrokSession(cookies={"sso": "abc"}, headers={}, email="u@x.ai")
+    assert GrokImageProvider(session=sess).is_configured() is True
+
+
+def test_grok_provider_reads_session_from_kwarg_only():
+    """The constructor never falls back to env vars for auth."""
+    p1 = GrokImageProvider()
+    assert not p1.is_configured()
+    from core.pixelle.grok_web_client import GrokSession
+
+    p2 = GrokImageProvider(session=GrokSession(cookies={"a": "b"}))
+    assert p2.is_configured()
 
 
 def test_google_whisk_reads_env(monkeypatch: pytest.MonkeyPatch):
@@ -225,3 +235,111 @@ def test_comfyui_generate_image_raises_not_configured_when_no_url(
     assert not p.is_configured()
     with pytest.raises(ProviderNotConfiguredError):
         p.generate_image(_scene(), output_path=tmp_path / "x.png")
+
+
+# ─── PR-A4.2: Grok image provider real-wiring tests ──────────────────────────
+
+
+def _grok_session():
+    from core.pixelle.grok_web_client import GrokSession
+
+    return GrokSession(cookies={"sso": "abc"}, headers={}, email="u@x.ai")
+
+
+def test_grok_generate_image_writes_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Happy path: provider calls ``generate_image_via_web`` and writes
+    the returned bytes to ``output_path``.
+    """
+    from core.pixelle import grok_web_client as gwc
+
+    fake_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8000
+
+    def _fake_generate(prompt, session, **kwargs):
+        assert prompt  # non-empty
+        assert session is not None
+        return [fake_bytes]
+
+    monkeypatch.setattr(gwc, "generate_image_via_web", _fake_generate)
+
+    p = GrokImageProvider(session=_grok_session())
+    out = p.generate_image(_scene(), output_path=tmp_path / "scene.png")
+    assert out == tmp_path / "scene.png"
+    assert (tmp_path / "scene.png").read_bytes() == fake_bytes
+
+
+def test_grok_generate_image_translates_error_to_placeholder_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """A :class:`GrokWebError` from the client should be wrapped in
+    :class:`UsePlaceholderFallback` so the Producer page can recover.
+    """
+    from core.pixelle import grok_web_client as gwc
+
+    def _boom(prompt, session, **kwargs):
+        raise gwc.GrokWebError("expired session")
+
+    monkeypatch.setattr(gwc, "generate_image_via_web", _boom)
+
+    p = GrokImageProvider(session=_grok_session())
+    with pytest.raises(UsePlaceholderFallback) as exc_info:
+        p.generate_image(_scene(), output_path=tmp_path / "x.png")
+    assert isinstance(exc_info.value.__cause__, gwc.GrokWebError)
+
+
+def test_grok_generate_image_raises_not_configured_without_session(
+    tmp_path: Path,
+):
+    p = GrokImageProvider()  # no session
+    with pytest.raises(ProviderNotConfiguredError):
+        p.generate_image(_scene(), output_path=tmp_path / "x.png")
+
+
+def test_grok_generate_image_makes_no_http_calls_without_session(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """No session → no HTTP calls. ``requests`` is monkeypatched to a
+    sentinel that fails the test if used.
+    """
+    from core.pixelle import grok_web_client as gwc
+
+    def _boom(*a, **k):
+        raise AssertionError("HTTP must not be called when session is None")
+
+    monkeypatch.setattr(gwc, "generate_image_via_web", _boom)
+
+    p = GrokImageProvider()
+    with pytest.raises(ProviderNotConfiguredError):
+        p.generate_image(_scene(), output_path=tmp_path / "x.png")
+
+
+def test_grok_generate_image_passes_aspect_ratio(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from core.pixelle import grok_web_client as gwc
+
+    captured: dict = {}
+
+    def _spy(prompt, session, **kwargs):
+        captured.update(kwargs)
+        return [b"\x89PNG" + b"\x00" * 8000]
+
+    monkeypatch.setattr(gwc, "generate_image_via_web", _spy)
+
+    p = GrokImageProvider(session=_grok_session(), aspect_ratio="16:9")
+    p.generate_image(_scene(), output_path=tmp_path / "x.png")
+    assert captured["aspect_ratio"] == "16:9"
+
+
+def test_grok_generate_video_raises_not_implemented(tmp_path: Path):
+    """Video wiring lands in PR-A5; PR-A4.2 keeps the stub behaviour."""
+    p = GrokImageProvider(session=_grok_session())
+    with pytest.raises(ProviderNotImplementedError):
+        p.generate_video(_scene(), output_path=tmp_path / "x.mp4")
+
+
+def test_grok_generate_video_raises_not_configured_without_session(tmp_path: Path):
+    p = GrokImageProvider()  # no session
+    with pytest.raises(ProviderNotConfiguredError):
+        p.generate_video(_scene(), output_path=tmp_path / "x.mp4")

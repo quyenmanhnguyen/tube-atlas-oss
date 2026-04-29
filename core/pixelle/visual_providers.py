@@ -309,22 +309,114 @@ class GeminiImageProvider(_StubVisualProvider):
         return "Set GEMINI_API_KEY (or GOOGLE_API_KEY) to enable Gemini image generation."
 
 
-class GrokImageProvider(_StubVisualProvider):
-    """xAI / Grok image generation (Aurora)."""
+class GrokImageProvider(VisualProvider):
+    """grok.com / xAI image generation (Aurora / imagine-x-1).
+
+    PR-A4.2 wires real image generation through
+    :mod:`core.pixelle.grok_web_client`. Auth is **runtime** — a
+    :class:`~core.pixelle.grok_web_client.GrokSession` is captured by
+    :func:`core.pixelle.grok_browser.grok_browser_login` after the
+    user enters their email and password in the Streamlit credential
+    dialog. The session is *not* read from environment variables and
+    *not* persisted to disk; it lives in ``st.session_state`` for the
+    lifetime of the page.
+
+    Construction is two-step so the registry helpers
+    (:func:`get_provider`, :func:`list_provider_specs`) can introspect
+    the provider without a session. The Producer page builds a
+    *configured* instance once a login succeeds::
+
+        provider = GrokImageProvider(session=st.session_state["grok_session"])
+
+    Any failure inside :meth:`generate_image` — expired session,
+    server error, moderation blocking every candidate — is translated
+    into :class:`UsePlaceholderFallback` so the Producer page degrades
+    cleanly to the gradient placeholder. Video generation
+    (:meth:`generate_video`) lands in PR-A5.
+    """
 
     info = ProviderInfo(
         name="grok_image",
         label="Grok / xAI image (Aurora)",
         kind="image",
-        requires=["XAI_API_KEY"],
-        notes="Real wiring lands in a follow-up PR. Today: prompt-only.",
+        requires=["Grok account login (email + password)"],
+        notes=(
+            "Drives grok.com's web image endpoint after a Playwright "
+            "auto-login. Sign in once with your grok.com email and "
+            "password in the credential dialog above; the session "
+            "lives in memory only. Falls back to the gradient "
+            "placeholder if the session expires or moderation blocks "
+            "every candidate."
+        ),
     )
 
+    def __init__(
+        self,
+        *,
+        session: "object | None" = None,
+        aspect_ratio: str = "9:16",
+    ) -> None:
+        # ``session`` is typed as ``object`` here to avoid an import
+        # cycle on grok_web_client at registry-construction time. The
+        # method bodies do a lazy import + isinstance check.
+        self._session = session
+        self._aspect_ratio = aspect_ratio
+
     def is_configured(self) -> bool:
-        return bool(os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY"))
+        return self._session is not None
 
     def missing_reason(self) -> str:
-        return "Set XAI_API_KEY (or GROK_API_KEY) to enable Grok image generation."
+        return (
+            "No active Grok login. Sign in with your grok.com email "
+            "and password using the credential dialog."
+        )
+
+    def generate_image(self, prompt: ScenePrompt, *, output_path: Path) -> Path:
+        if self._session is None:
+            raise ProviderNotConfiguredError(self.missing_reason())
+
+        # Lazy import keeps ``import core.pixelle`` cheap — pages that
+        # never pick the Grok provider don't pay for ``requests`` setup.
+        from core.pixelle.grok_web_client import (
+            GrokSession,
+            GrokWebError,
+            generate_image_via_web,
+        )
+
+        if not isinstance(self._session, GrokSession):
+            raise ProviderNotConfiguredError(
+                "GrokImageProvider session is not a GrokSession instance."
+            )
+
+        try:
+            images = generate_image_via_web(
+                prompt.image_prompt,
+                self._session,
+                aspect_ratio=self._aspect_ratio,
+                image_count=1,
+            )
+        except GrokWebError as exc:
+            raise UsePlaceholderFallback(
+                f"Grok generate failed → falling back to placeholder: {exc}"
+            ) from exc
+
+        if not images:
+            raise UsePlaceholderFallback(
+                "Grok returned no usable images → falling back to placeholder."
+            )
+
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(images[0])
+        return output_path
+
+    def generate_video(self, prompt: ScenePrompt, *, output_path: Path) -> Path | None:
+        # Video wiring lands in PR-A5.
+        if self._session is None:
+            raise ProviderNotConfiguredError(self.missing_reason())
+        raise ProviderNotImplementedError(
+            f"{self.info.label}: video API integration is not wired yet."
+        )
 
 
 # ─── Registry helpers ────────────────────────────────────────────────────────
