@@ -20,6 +20,7 @@ from __future__ import annotations
 from core.pixelle.composer import ComposerOptions, SceneAsset, make_short
 from core.pixelle.config import (
     ComfyUIConfig,
+    GrokConfig,
     LLMConfig,
     PixelleConfig,
     TTSConfig,
@@ -106,6 +107,7 @@ __all__ = [
     "EdgeTTSAdapter",
     "GeminiImageProvider",
     "GoogleWhiskProvider",
+    "GrokConfig",
     "GrokImageProvider",
     "LLMConfig",
     "LongFormScene",

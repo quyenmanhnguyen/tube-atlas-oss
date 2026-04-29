@@ -90,6 +90,25 @@ class ComfyUIConfig:
 
 
 @dataclass(frozen=True)
+class GrokConfig:
+    """grok.com / xAI configuration for the visual-provider chain.
+
+    Auth is **runtime-only**: PR-A4.2 ships a Playwright-driven login
+    flow that captures a session in :class:`st.session_state` after
+    the user enters their grok.com email + password in the Streamlit
+    UI. There are no env vars to manage, no API key to paste, and
+    nothing is persisted to disk.
+
+    This class exists as a placeholder so the rest of the
+    :class:`PixelleConfig` shape stays consistent — the field is
+    populated lazily by the page that owns the session and never
+    inspected at module load time.
+    """
+
+    auth_kind: str = "browser_login"  # informational; not user-tunable
+
+
+@dataclass(frozen=True)
 class TTSConfig:
     """Text-to-speech configuration.
 
@@ -109,6 +128,7 @@ class PixelleConfig:
 
     llm: LLMConfig = field(default_factory=LLMConfig)
     comfy: ComfyUIConfig = field(default_factory=ComfyUIConfig)
+    grok: GrokConfig = field(default_factory=GrokConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
 
     def describe(self) -> dict[str, str]:
@@ -120,6 +140,7 @@ class PixelleConfig:
             "llm.gemini_key": "set" if self.llm.gemini_key else "missing",
             "comfy.local_url": self.comfy.local_url,
             "comfy.cloud_available": "yes" if self.comfy.cloud_available else "no",
+            "grok.auth_kind": self.grok.auth_kind,
             "tts.engine": self.tts.engine,
             "tts.voice": self.tts.voice,
         }

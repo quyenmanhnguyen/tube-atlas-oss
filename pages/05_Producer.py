@@ -21,6 +21,7 @@ Mode picker:
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -32,6 +33,7 @@ from core.pixelle import (
     ComfyUIVisualProvider,
     ComposerOptions,
     EdgeTTSAdapter,
+    GrokImageProvider,
     PRESET_NAMES,
     PixelleConfig,
     SCENE_TEMPLATES,
@@ -77,6 +79,110 @@ page_header(
 )
 
 CFG = load_config()
+
+
+# ─── Credentials dialog (PR-A4.2) ────────────────────────────────────────────
+def _save_env_var(key: str, value: str) -> None:
+    """Append/update ``key=value`` in the project's ``.env`` file.
+
+    The .env file lives at the repo root (parent of ``pages/``). We
+    rewrite the file in-place so subsequent Streamlit reruns pick the
+    new value up via ``python-dotenv``. The function is intentionally
+    naïve — for a single-user dev tool, atomic rename + lock are
+    overkill; we only ever write small strings.
+    """
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    rendered = f"{key}={value}"
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[i] = rendered
+            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            return
+    lines.append(rendered)
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _ensure_credentials() -> None:
+    """Surface a credential-input panel for any missing auth.
+
+    PR-A4.2 introduces a Playwright-driven Grok login that captures a
+    session into ``st.session_state["grok_session"]``. The DeepSeek
+    API key — needed for scene-prompt generation and long-form
+    breakdowns — is collected via the same panel and persisted to
+    the project's ``.env`` so future runs don't re-prompt.
+
+    The panel is *informational* — it does not stop the page. Users
+    can still run the gradient placeholder pipeline (no Grok / no
+    DeepSeek) without entering anything. Real generation paths check
+    ``is_configured()`` and degrade to placeholder if the panel was
+    skipped.
+    """
+    grok_session = st.session_state.get("grok_session")
+    deepseek_set = bool(os.getenv("DEEPSEEK_API_KEY"))
+    if grok_session and deepseek_set:
+        return
+
+    with st.expander("⚠️  " + t("producer_missing_credentials"), expanded=False):
+        st.caption(t("producer_missing_credentials_help"))
+
+        if not grok_session:
+            st.markdown(f"**{t('producer_grok_cookie_label')}**")
+            st.caption("Email + password — used once to log into grok.com via Playwright. Nothing is persisted to disk.")
+            col1, col2 = st.columns(2)
+            with col1:
+                grok_email = st.text_input(
+                    "Email",
+                    key="producer_grok_email_input",
+                )
+            with col2:
+                grok_pass = st.text_input(
+                    "Password",
+                    type="password",
+                    key="producer_grok_pass_input",
+                )
+            if st.button("🔐 Login to Grok", key="producer_grok_login_btn"):
+                if not grok_email or not grok_pass:
+                    st.error("Email and password are both required.")
+                else:
+                    with st.spinner("Logging in via Playwright (~30s)…"):
+                        try:
+                            from core.pixelle.grok_browser import (
+                                GrokBrowserError,
+                                grok_browser_login,
+                            )
+
+                            session = grok_browser_login(grok_email, grok_pass)
+                        except GrokBrowserError as exc:
+                            st.error(f"Login failed: {exc}")
+                        except Exception as exc:  # noqa: BLE001
+                            st.error(f"{type(exc).__name__}: {exc}")
+                        else:
+                            st.session_state["grok_session"] = session
+                            st.success(t("producer_credentials_saved"))
+                            st.rerun()
+
+        if not deepseek_set:
+            st.markdown(f"**{t('producer_deepseek_label')}**")
+            st.caption(t("producer_deepseek_help"))
+            ds_key = st.text_input(
+                t("producer_deepseek_label"),
+                type="password",
+                key="producer_ds_key_input",
+                label_visibility="collapsed",
+            )
+            if st.button(
+                t("producer_credentials_save"),
+                key="producer_ds_save_btn",
+            ):
+                if ds_key.strip():
+                    _save_env_var("DEEPSEEK_API_KEY", ds_key.strip())
+                    os.environ["DEEPSEEK_API_KEY"] = ds_key.strip()
+                    st.success(t("producer_credentials_saved"))
+                    st.rerun()
+
+
+_ensure_credentials()
 
 
 # ─── Cross-page handoff: prefill from Studio output ──────────────────────────
@@ -455,6 +561,13 @@ def _provider_picker() -> VisualProvider:
 
     if provider_name == "comfyui_local":
         provider: VisualProvider = _build_comfyui_provider()
+    elif provider_name == "grok_image":
+        # PR-A4.2: inject the runtime session captured by the
+        # credentials dialog (Playwright login). When no session is
+        # present, the provider stays unconfigured and the run
+        # pipeline falls back to the gradient placeholder.
+        grok_session = st.session_state.get("grok_session")
+        provider = GrokImageProvider(session=grok_session)
     else:
         provider = get_provider(provider_name)
 
@@ -663,6 +776,63 @@ def _generate_scene_assets_via_comfyui(
     return assets
 
 
+def _generate_scene_assets_via_grok(
+    *,
+    provider: GrokImageProvider,
+    scene_prompts: list[ScenePrompt],
+    audio_duration_s: float,
+    output_dir: Path,
+) -> list[SceneAsset] | None:
+    """Drive the Grok image provider per-scene; return assets on success.
+
+    Mirrors :func:`_generate_scene_assets_via_comfyui`: all-or-nothing.
+    A single scene failure rolls the whole pipeline back to the
+    gradient placeholder so the composer's timeline stays consistent.
+    """
+    images_dir = output_dir / "scenes"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    scene_progress = st.progress(0, text="")
+    assets: list[SceneAsset] = []
+    total_scene_seconds = sum(max(0.0, s.duration) for s in scene_prompts)
+    if total_scene_seconds <= 0:
+        return None
+    scale = audio_duration_s / total_scene_seconds if total_scene_seconds else 1.0
+    cursor = 0.0
+
+    for i, sp in enumerate(scene_prompts, start=1):
+        scene_progress.progress(
+            (i - 1) / max(1, len(scene_prompts)),
+            text=t("producer_grok_scene_step").format(i=i, n=len(scene_prompts)),
+        )
+        out_path = images_dir / f"scene_{i:02d}.png"
+        try:
+            provider.generate_image(sp, output_path=out_path)
+        except UsePlaceholderFallback as exc:
+            st.warning(
+                t("producer_grok_scene_fail").format(i=i, reason=str(exc))
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001 — any other failure also falls back
+            st.warning(
+                t("producer_grok_scene_fail").format(i=i, reason=f"{type(exc).__name__}: {exc}")
+            )
+            return None
+        scaled_dur = max(0.5, sp.duration * scale)
+        assets.append(
+            SceneAsset(
+                image_path=out_path,
+                start_s=cursor,
+                duration_s=scaled_dur,
+            )
+        )
+        cursor += scaled_dur
+
+    scene_progress.progress(1.0, text="")
+    st.success(t("producer_grok_using").format(n=len(assets)))
+    return assets
+
+
 if run_clicked:
     if not script.strip():
         st.warning(t("producer_no_script"))
@@ -696,8 +866,19 @@ if run_clicked:
             audio_duration_s=audio_duration,
             output_dir=out_dir,
         )
+    elif visual_provider.info.name == "grok_image":
+        if not visual_provider.is_configured():
+            st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
+        else:
+            scene_prompts = build_scene_prompts(script, style_source)
+            scene_assets = _generate_scene_assets_via_grok(
+                provider=visual_provider,  # type: ignore[arg-type]
+                scene_prompts=scene_prompts,
+                audio_duration_s=audio_duration,
+                output_dir=out_dir,
+            )
     elif visual_provider.info.name != "placeholder":
-        # Whisk / Gemini / Grok stubs — show the not-wired notice and
+        # Whisk / Gemini stubs — show the not-wired notice and
         # use the gradient placeholder for the actual render.
         st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
 

@@ -74,6 +74,18 @@ def test_gemini_key_accepts_either_env_var(monkeypatch):
     assert cfg.llm.gemini_key == "g-2"
 
 
+def test_grok_config_default_describes_browser_login():
+    """PR-A4.2: Grok auth is runtime browser login; no env vars used."""
+    cfg = pixelle_config.load_config()
+    assert cfg.grok.auth_kind == "browser_login"
+
+
+def test_describe_includes_grok_auth_kind():
+    cfg = pixelle_config.load_config()
+    summary = cfg.describe()
+    assert summary["grok.auth_kind"] == "browser_login"
+
+
 def test_runninghub_cloud_only_requires_key(monkeypatch):
     """cloud_only=True without RUNNINGHUB_API_KEY is a configuration error."""
     monkeypatch.delenv("RUNNINGHUB_API_KEY", raising=False)
