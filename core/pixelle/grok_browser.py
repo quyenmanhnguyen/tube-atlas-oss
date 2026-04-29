@@ -239,11 +239,20 @@ def _drive_login_form(
         raise GrokLoginFailed("Could not find the email input on accounts.x.ai/sign-in.")
     email_input.fill(email)
 
-    # Hit Enter or click the "Continue" button if present (two-step flow).
-    cont = page.locator("button:has-text('Continue')")
-    if cont.count() > 0:
-        cont.first.click()
-        page.wait_for_load_state("domcontentloaded")
+    # x.ai uses a multi-step form: email screen → "Next" → password
+    # screen → "Login". The button is labeled "Next" (not "Continue")
+    # and is ``type=submit``. Click whichever common label is present.
+    if not _try_click(
+        page,
+        [
+            "button:has-text('Next')",
+            "button:has-text('Continue')",
+            "button[type=submit]",
+        ],
+        timeout_ms=4_000,
+    ):
+        # Last-ditch: press Enter on the email field.
+        email_input.press("Enter")
 
     pwd_input = _first_visible_locator(
         page,
@@ -252,24 +261,24 @@ def _drive_login_form(
             "input[type=password]",
             "input[autocomplete=current-password]",
         ],
+        wait_timeout_ms=15_000,
     )
     if pwd_input is None:
         raise GrokLoginFailed("Could not find the password input on accounts.x.ai/sign-in.")
     pwd_input.fill(password)
 
-    submit = _first_visible_locator(
+    if not _try_click(
         page,
         [
-            "button[type=submit]",
-            "button:has-text('Sign in')",
+            "button:has-text('Login')",
             "button:has-text('Log in')",
+            "button:has-text('Sign in')",
+            "button[type=submit]",
         ],
-    )
-    if submit is None:
+        timeout_ms=4_000,
+    ):
         # Last-ditch: press Enter and hope the form binds it.
         pwd_input.press("Enter")
-    else:
-        submit.click()
 
 
 def _wait_for_grok_cookies(page: "Page", *, opts: GrokLoginOptions) -> None:
