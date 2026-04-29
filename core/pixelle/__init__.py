@@ -17,7 +17,7 @@ attribution.
 """
 from __future__ import annotations
 
-from core.pixelle.composer import ComposerOptions, SceneAsset, make_short
+from core.pixelle.composer import ComposerOptions, SceneAsset, VideoSceneAsset, make_short
 from core.pixelle.config import (
     ComfyUIConfig,
     GrokConfig,
@@ -118,6 +118,7 @@ __all__ = [
     "ProviderNotImplementedError",
     "SceneAsset",
     "ScenePrompt",
+    "VideoSceneAsset",
     "SceneTemplate",
     "Style",
     "StyleSource",
