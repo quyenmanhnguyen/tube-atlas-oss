@@ -30,6 +30,22 @@ def test_producer_i18n_strings_present_in_all_langs():
         "producer_no_script",
         "producer_caption_source_wb",
         "producer_caption_source_fb",
+        # PR-A3 — Visual generation section
+        "producer_visual_section",
+        "producer_style_src",
+        "producer_style_src_clone",
+        "producer_style_src_preset",
+        "producer_style_src_manual",
+        "producer_style_clone_hint",
+        "producer_style_manual_ref",
+        "producer_style_preset_pick",
+        "producer_provider_pick",
+        "producer_provider_ok",
+        "producer_provider_missing",
+        "producer_provider_fallback",
+        "producer_build_prompts",
+        "producer_scene_count",
+        "producer_download_prompts",
     ]
     required_languages = {"en", "ko", "ja", "vi"}
     for key in required_keys:

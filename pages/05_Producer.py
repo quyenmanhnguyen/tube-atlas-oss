@@ -1,12 +1,21 @@
 """Producer — turn a Studio script into a 9:16 short with voice + captions.
 
-PR-A2 ships with **placeholder visuals** (gradient + Ken Burns). PR-A3 will
-swap the placeholder background out for AI-generated imagery / video via
-ComfyUI workflows. The script input is plain text — paste from Studio or
-type freely; this page never calls the LLM.
+PR-A2 shipped placeholder visuals (gradient + Ken Burns). PR-A3 layers
+on a **prompt generator + provider abstraction** so users can:
+
+1. Pick a style source — Video Cloner kit, manual reference text, or a
+   named preset.
+2. Split the script into scenes and preview a JSON list of
+   image / video prompts ready to paste into Whisk, Grok, Imagen, etc.
+3. Pick a visual provider (Placeholder by default; ComfyUI, Whisk,
+   Gemini, Grok stubs are listed but not wired yet — they'll fall back
+   to gradient + warn the user).
+
+The script input is still plain text and this page never calls the LLM.
 """
 from __future__ import annotations
 
+import json
 import tempfile
 import time
 from pathlib import Path
@@ -17,10 +26,19 @@ from core.i18n import language_selector, t
 from core.pixelle import (
     ComposerOptions,
     EdgeTTSAdapter,
+    PRESET_NAMES,
     PixelleConfig,
     STYLES,
+    StyleSource,
+    VisualProvider,
+    build_scene_prompts,
     fallback_captions_from_text,
+    from_cloner_kit,
+    from_manual_reference,
+    from_preset,
+    get_provider,
     group_word_boundaries,
+    list_provider_specs,
     load_config,
     make_short,
 )
@@ -103,6 +121,115 @@ with right:
     run_clicked = st.button(t("producer_run"), type="primary", use_container_width=True)
 
 
+# ─── Visual generation (PR-A3) ───────────────────────────────────────────────
+def _resolve_style_source() -> StyleSource:
+    """Pick a :class:`StyleSource` based on the user's UI choice.
+
+    Three options surface depending on what's in session state:
+
+    - ``video_clone`` — only when ``cloner_style_kit`` was set by
+      :file:`pages/02_Video_Cloner.py`. Distilled via
+      :func:`from_cloner_kit`.
+    - ``manual`` — free-form reference text the user types in.
+    - ``preset`` — picks one of :data:`PRESET_NAMES`.
+    """
+    sources: list[str] = []
+    if isinstance(st.session_state.get("cloner_style_kit"), dict):
+        sources.append("video_clone")
+    sources.extend(["preset", "manual"])
+
+    label = {
+        "video_clone": t("producer_style_src_clone"),
+        "preset": t("producer_style_src_preset"),
+        "manual": t("producer_style_src_manual"),
+    }
+    pick = st.radio(
+        t("producer_style_src"),
+        options=sources,
+        format_func=lambda v: label.get(v, v),
+        horizontal=True,
+        key="producer_style_src_pick",
+    )
+    if pick == "video_clone":
+        kit = st.session_state.get("cloner_style_kit") or {}
+        st.caption(
+            t("producer_style_clone_hint").format(
+                title=kit.get("source_title", "?")
+            )
+        )
+        return from_cloner_kit(kit)
+    if pick == "manual":
+        ref = st.text_area(
+            t("producer_style_manual_ref"),
+            value=st.session_state.get("producer_style_manual_text", ""),
+            placeholder="warm cinematic, golden hour, shallow DoF…",
+            height=120,
+            key="producer_style_manual_text",
+        )
+        return from_manual_reference(ref)
+    preset_name = st.selectbox(
+        t("producer_style_preset_pick"),
+        options=PRESET_NAMES,
+        index=0,
+        key="producer_style_preset_pick_select",
+    )
+    return from_preset(preset_name)
+
+
+def _provider_picker() -> VisualProvider:
+    """Render the provider dropdown + status pill, return the instance."""
+    specs = list_provider_specs()
+    name_options = [s.name for s in specs]
+    label_lookup = {s.name: s.label for s in specs}
+    provider_name = st.selectbox(
+        t("producer_provider_pick"),
+        options=name_options,
+        format_func=lambda n: label_lookup.get(n, n),
+        index=0,
+        key="producer_provider_pick_select",
+    )
+    provider = get_provider(provider_name)
+    if provider.is_configured():
+        st.success(
+            t("producer_provider_ok").format(label=provider.info.label)
+        )
+    else:
+        st.warning(
+            t("producer_provider_missing").format(
+                label=provider.info.label,
+                reason=provider.missing_reason(),
+            )
+        )
+    if provider.info.notes:
+        st.caption(provider.info.notes)
+    return provider
+
+
+with st.expander("🎨 " + t("producer_visual_section"), expanded=False):
+    style_source = _resolve_style_source()
+    visual_provider = _provider_picker()
+    if st.button(t("producer_build_prompts"), key="producer_build_prompts_btn"):
+        if not script.strip():
+            st.warning(t("producer_no_script"))
+        else:
+            st.session_state["producer_scene_prompts"] = [
+                sp.to_json() for sp in build_scene_prompts(script, style_source)
+            ]
+    cached_prompts = st.session_state.get("producer_scene_prompts")
+    if cached_prompts:
+        st.caption(
+            t("producer_scene_count").format(n=len(cached_prompts))
+        )
+        st.json(cached_prompts, expanded=False)
+        st.download_button(
+            t("producer_download_prompts"),
+            data=json.dumps(cached_prompts, ensure_ascii=False, indent=2).encode("utf-8"),
+            file_name="scene_prompts.json",
+            mime="application/json",
+            key="producer_download_prompts_btn",
+        )
+
+
 # ─── Pipeline ────────────────────────────────────────────────────────────────
 def _run_pipeline(
     *,
@@ -136,6 +263,10 @@ def _run_pipeline(
     progress.progress(60, text=t("producer_step_render"))
     mp4_path = output_dir / "short.mp4"
     options = ComposerOptions(style=style)
+    # PR-A3: visual provider is selected in the UI but only Placeholder is
+    # actually wired to the composer. Real ComfyUI / Whisk / Gemini / Grok
+    # integration lands in a follow-up PR. For now, non-placeholder picks
+    # silently fall back to the gradient Ken Burns background.
     make_short(
         audio_path,
         mp4_path,
@@ -151,6 +282,13 @@ if run_clicked:
     if not script.strip():
         st.warning(t("producer_no_script"))
         st.stop()
+
+    # Warn if a non-Placeholder provider was selected — PR-A3 doesn't yet
+    # wire those to the composer, so the render will use the gradient
+    # background regardless. Users can still use the prompt JSON for
+    # external tools like Whisk / Grok.
+    if visual_provider.info.name != "placeholder":
+        st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
 
     voice_meta = voice_by_short_name(voice_short) or VOICES[0]
     out_dir = Path(tempfile.gettempdir()) / "tube-atlas-producer" / f"run-{int(time.time())}"
