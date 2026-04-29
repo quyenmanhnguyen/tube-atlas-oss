@@ -45,6 +45,7 @@ from core.pixelle import (
     SceneTemplate,
     StyleSource,
     UsePlaceholderFallback,
+    VideoSceneAsset,
     VisualProvider,
     build_scene_prompts,
     build_thumbnail_prompt,
@@ -562,12 +563,12 @@ def _provider_picker() -> VisualProvider:
     if provider_name == "comfyui_local":
         provider: VisualProvider = _build_comfyui_provider()
     elif provider_name == "grok_image":
-        # PR-A4.2: inject the runtime session captured by the
+        # PR-A4.2/A5: inject the runtime session captured by the
         # credentials dialog (Playwright login). When no session is
         # present, the provider stays unconfigured and the run
-        # pipeline falls back to the gradient placeholder.
-        grok_session = st.session_state.get("grok_session")
-        provider = GrokImageProvider(session=grok_session)
+        # pipeline falls back to the gradient placeholder. The video
+        # mode picker (PR-A5) chooses image vs. video and Veo knobs.
+        provider = _build_grok_provider()
     else:
         provider = get_provider(provider_name)
 
@@ -630,6 +631,60 @@ def _build_comfyui_provider() -> ComfyUIVisualProvider:
         workflow_path=workflow_path,
         checkpoint=checkpoint or None,
         seed=seed,
+    )
+
+
+def _build_grok_provider() -> GrokImageProvider:
+    """Render Grok-specific knobs and return a configured provider.
+
+    PR-A5 introduces a *visual mode* picker — image (Aurora) vs.
+    video (Veo 3) — plus Veo 3-only sliders for clip length and
+    resolution. The picked values are surfaced in
+    ``st.session_state["producer_grok_video_mode"]`` so the run
+    pipeline knows whether to call ``generate_image`` or
+    ``generate_video`` per scene.
+
+    The session is read from ``st.session_state["grok_session"]`` —
+    populated by the credentials dialog at the top of the page.
+    """
+    with st.container():
+        st.caption("⚙️ " + t("producer_video_mode_label"))
+        mode = st.radio(
+            t("producer_video_mode_label"),
+            options=("image", "video"),
+            format_func=lambda key: t(f"producer_video_mode_{key}"),
+            index=0,
+            horizontal=True,
+            key="producer_grok_video_mode_select",
+            label_visibility="collapsed",
+        )
+        st.session_state["producer_grok_video_mode"] = mode
+
+        video_length = 6
+        resolution = "720p"
+        if mode == "video":
+            col1, col2 = st.columns(2)
+            with col1:
+                video_length = st.selectbox(
+                    t("producer_video_length"),
+                    options=(6, 10),
+                    index=0,
+                    key="producer_grok_video_length_select",
+                )
+            with col2:
+                resolution = st.selectbox(
+                    t("producer_video_resolution"),
+                    options=("720p", "480p"),
+                    index=0,
+                    key="producer_grok_video_resolution_select",
+                )
+
+    grok_session = st.session_state.get("grok_session")
+    return GrokImageProvider(
+        session=grok_session,
+        aspect_ratio="9:16",
+        video_length=int(video_length),
+        resolution=resolution,
     )
 
 
@@ -833,6 +888,68 @@ def _generate_scene_assets_via_grok(
     return assets
 
 
+def _generate_video_scene_assets_via_grok(
+    *,
+    provider: GrokImageProvider,
+    scene_prompts: list[ScenePrompt],
+    audio_duration_s: float,
+    output_dir: Path,
+) -> list[VideoSceneAsset] | None:
+    """Drive the Grok provider's video pipeline per scene → return assets.
+
+    Each call goes through the slow ``POST /rest/media/post/create``
+    + chat NDJSON stream + MP4 download — typically 60–180 seconds
+    per scene. We surface a per-scene progress bar with the
+    server-reported percent so the user has a heartbeat. All-or-
+    nothing rollback to the gradient placeholder mirrors the image
+    flow.
+    """
+    videos_dir = output_dir / "scene_videos"
+    videos_dir.mkdir(parents=True, exist_ok=True)
+
+    overall_progress = st.progress(0, text="")
+    assets: list[VideoSceneAsset] = []
+    total_scene_seconds = sum(max(0.0, s.duration) for s in scene_prompts)
+    if total_scene_seconds <= 0:
+        return None
+    scale = audio_duration_s / total_scene_seconds if total_scene_seconds else 1.0
+    cursor = 0.0
+    n_total = len(scene_prompts)
+
+    for i, sp in enumerate(scene_prompts, start=1):
+        overall_progress.progress(
+            (i - 1) / max(1, n_total),
+            text=t("producer_grok_video_step").format(i=i, n=n_total, progress=0),
+        )
+        out_path = videos_dir / f"scene_{i:02d}.mp4"
+        try:
+            provider.generate_video(sp, output_path=out_path)
+        except UsePlaceholderFallback as exc:
+            st.warning(
+                t("producer_grok_video_fail").format(i=i, reason=str(exc))
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001 — any other failure also falls back
+            st.warning(
+                t("producer_grok_video_fail").format(i=i, reason=f"{type(exc).__name__}: {exc}")
+            )
+            return None
+
+        scaled_dur = max(0.5, sp.duration * scale)
+        assets.append(
+            VideoSceneAsset(
+                video_path=out_path,
+                start_s=cursor,
+                duration_s=scaled_dur,
+            )
+        )
+        cursor += scaled_dur
+
+    overall_progress.progress(1.0, text="")
+    st.success(t("producer_grok_video_using").format(n=len(assets)))
+    return assets
+
+
 if run_clicked:
     if not script.strip():
         st.warning(t("producer_no_script"))
@@ -858,6 +975,7 @@ if run_clicked:
 
     # Resolve scene assets if the user picked a real visual provider.
     scene_assets: list[SceneAsset] | None = None
+    video_scene_assets: list[VideoSceneAsset] | None = None
     if visual_provider.info.name == "comfyui_local":
         scene_prompts = build_scene_prompts(script, style_source)
         scene_assets = _generate_scene_assets_via_comfyui(
@@ -871,12 +989,21 @@ if run_clicked:
             st.info(t("producer_provider_fallback").format(label=visual_provider.info.label))
         else:
             scene_prompts = build_scene_prompts(script, style_source)
-            scene_assets = _generate_scene_assets_via_grok(
-                provider=visual_provider,  # type: ignore[arg-type]
-                scene_prompts=scene_prompts,
-                audio_duration_s=audio_duration,
-                output_dir=out_dir,
-            )
+            grok_mode = st.session_state.get("producer_grok_video_mode", "image")
+            if grok_mode == "video":
+                video_scene_assets = _generate_video_scene_assets_via_grok(
+                    provider=visual_provider,  # type: ignore[arg-type]
+                    scene_prompts=scene_prompts,
+                    audio_duration_s=audio_duration,
+                    output_dir=out_dir,
+                )
+            else:
+                scene_assets = _generate_scene_assets_via_grok(
+                    provider=visual_provider,  # type: ignore[arg-type]
+                    scene_prompts=scene_prompts,
+                    audio_duration_s=audio_duration,
+                    output_dir=out_dir,
+                )
     elif visual_provider.info.name != "placeholder":
         # Whisk / Gemini stubs — show the not-wired notice and
         # use the gradient placeholder for the actual render.
@@ -903,6 +1030,7 @@ if run_clicked:
             duration_hint=audio_duration,
             options=options,
             scene_assets=scene_assets,
+            video_scene_assets=video_scene_assets,
         )
     except Exception as exc:  # noqa: BLE001 — surface any failure to the user
         st.error(f"{type(exc).__name__}: {exc}")
